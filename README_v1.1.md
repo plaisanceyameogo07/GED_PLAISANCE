@@ -17,7 +17,7 @@ cd ged-serveur
 node server.js
 
 # 2. Terminal 2 : Ouvrir le navigateur
-http://localhost:3000/ged-serveur/GED_Plaisance_v6.html
+http://localhost:3000/GED_Plaisance_v6.html
 
 # 3. Console (F12) : Vérifier le pré-cache
 ✅ Pré-cache terminé : N fichiers pré-cachés
