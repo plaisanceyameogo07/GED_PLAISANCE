@@ -1,0 +1,413 @@
+{
+  "tree": {
+    "id": "root",
+    "name": "DOSSIER ARCHIVES",
+    "type": "folder",
+    "children": [
+      {
+        "id": "f0",
+        "name": "CV.YAMEOGO_Plaisance_Archive.pdf",
+        "type": "file",
+        "ext": "pdf",
+        "size": "245 Ko",
+        "date": "12/01/2024",
+        "tags": [
+          "CV",
+          "RH"
+        ],
+        "stored": false,
+        "meta": {
+          "auteur": "Y. Plaisance",
+          "version": "v2",
+          "statut": "Validé"
+        },
+        "desc": "Curriculum Vitae — Plaisance YAMEOGO"
+      },
+      {
+        "id": "f1",
+        "name": "Gestion_des_documents.docx",
+        "type": "file",
+        "ext": "docx",
+        "size": "38 Ko",
+        "date": "08/03/2024",
+        "tags": [
+          "Procédure"
+        ],
+        "stored": false,
+        "meta": {
+          "auteur": "Service Admin",
+          "version": "v1",
+          "statut": "En cours"
+        },
+        "desc": "Procédure de gestion et classement des documents"
+      },
+      {
+        "id": "f2",
+        "name": "Projets_réalisés.docx",
+        "type": "file",
+        "ext": "docx",
+        "size": "52 Ko",
+        "date": "15/02/2024",
+        "tags": [
+          "Projet",
+          "Bilan"
+        ],
+        "stored": false,
+        "meta": {
+          "auteur": "Direction",
+          "version": "v1",
+          "statut": "Finalisé"
+        },
+        "desc": "Rapport des projets réalisés 2023-2024"
+      },
+      {
+        "id": "A",
+        "name": "A- ADMINISTRATION GENERALE",
+        "type": "folder",
+        "children": [
+          {
+            "id": "A1",
+            "name": "A1- Gestion des courriers",
+            "type": "folder",
+            "children": [
+              {
+                "id": "A11",
+                "name": "A1.1- Courrier arrivée",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "cp_1778424365009",
+                    "name": "Brevet_d'Etudes_du_Premier_Cycle (copie).pdf",
+                    "type": "file",
+                    "ext": "pdf",
+                    "size": "662.8 Ko",
+                    "rawSize": 678685,
+                    "date": "02/05/2026",
+                    "mimeType": "application/pdf",
+                    "stored": true,
+                    "tags": [],
+                    "desc": "",
+                    "meta": {
+                      "auteur": "",
+                      "version": "v1",
+                      "statut": "Validé"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "A12",
+                "name": "A1.2- Courrier départ",
+                "type": "folder",
+                "children": []
+              },
+              {
+                "id": "A13",
+                "name": "A1.3- Courrier officiel",
+                "type": "folder",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "A2",
+            "name": "A2- Relations partenaires",
+            "type": "folder",
+            "children": [
+              {
+                "id": "A21",
+                "name": "A2.1- Partenaire X",
+                "type": "folder",
+                "children": []
+              },
+              {
+                "id": "A22",
+                "name": "A2.2- Partenaire Y",
+                "type": "folder",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "A3",
+            "name": "A3- Audit et contrôle interne",
+            "type": "folder",
+            "children": [
+              {
+                "id": "A31",
+                "name": "A3.1- Audit interne",
+                "type": "folder",
+                "children": []
+              },
+              {
+                "id": "A32",
+                "name": "A3.2- Audit externe",
+                "type": "folder",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "A4",
+            "name": "A4- Support logistique",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "A5",
+            "name": "A5- Communication et marketing",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "A6",
+            "name": "A6- Ressources humaines",
+            "type": "folder",
+            "children": [
+              {
+                "id": "A6c",
+                "name": "courant",
+                "type": "folder",
+                "children": [
+                  {
+                    "id": "A6f1",
+                    "name": "Untitled_document_v01.docx",
+                    "type": "file",
+                    "ext": "docx",
+                    "size": "12 Ko",
+                    "date": "20/04/2024",
+                    "tags": [
+                      "RH",
+                      "Brouillon"
+                    ],
+                    "stored": false,
+                    "meta": {
+                      "auteur": "Service RH",
+                      "version": "v01",
+                      "statut": "Brouillon"
+                    },
+                    "desc": "Document RH en cours"
+                  },
+                  {
+                    "id": "A6f2",
+                    "name": "Untitled_spreadsheet.xlsx",
+                    "type": "file",
+                    "ext": "xlsx",
+                    "size": "8 Ko",
+                    "date": "20/04/2024",
+                    "tags": [
+                      "RH"
+                    ],
+                    "stored": false,
+                    "meta": {
+                      "auteur": "Service RH",
+                      "version": "v01",
+                      "statut": "Brouillon"
+                    },
+                    "desc": "Tableau de suivi RH"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "A7",
+            "name": "A7- Gestion financière et comptable",
+            "type": "folder",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "B",
+        "name": "B- PROJETS ET PROGRAMMES",
+        "type": "folder",
+        "children": [
+          {
+            "id": "B1",
+            "name": "B1- Projets en cours",
+            "type": "folder",
+            "children": [
+              {
+                "id": "B11",
+                "name": "B1.1- Projet Alpha",
+                "type": "folder",
+                "children": []
+              },
+              {
+                "id": "B12",
+                "name": "B1.2- Projet Beta",
+                "type": "folder",
+                "children": []
+              }
+            ]
+          },
+          {
+            "id": "B2",
+            "name": "B2- Projets archivés",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "B3",
+            "name": "B3- Rapports de suivi",
+            "type": "folder",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "C",
+        "name": "C- FINANCES ET COMPTABILITE",
+        "type": "folder",
+        "children": [
+          {
+            "id": "C1",
+            "name": "C1- Budgets",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "C2",
+            "name": "C2- Factures",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "C3",
+            "name": "C3- États financiers",
+            "type": "folder",
+            "children": [
+              {
+                "id": "C31",
+                "name": "C3.1- Bilans",
+                "type": "folder",
+                "children": []
+              },
+              {
+                "id": "C32",
+                "name": "C3.2- Comptes de résultat",
+                "type": "folder",
+                "children": []
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "D",
+        "name": "D- RESSOURCES HUMAINES",
+        "type": "folder",
+        "children": [
+          {
+            "id": "D1",
+            "name": "D1- Contrats de travail",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "D2",
+            "name": "D2- Formations",
+            "type": "folder",
+            "children": [
+              {
+                "id": "up_1778762122128",
+                "name": "EBOOK--Livre Guide Ultime du Gestionnaire des Archives à l'ère du numérique.pdf",
+                "type": "file",
+                "ext": "pdf",
+                "size": "5.5 Mo",
+                "rawSize": 5772725,
+                "date": "14/05/2026",
+                "mimeType": "application/pdf",
+                "stored": true,
+                "tags": [],
+                "desc": "",
+                "meta": {
+                  "auteur": "",
+                  "version": "v1",
+                  "statut": "Validé"
+                },
+                "downloadURL": "http://localhost:3000/api/files/up_1778762122128"
+              },
+              {
+                "id": "up_1778762122129",
+                "name": "GEDC-PRO.pdf",
+                "type": "file",
+                "ext": "pdf",
+                "size": "4.9 Mo",
+                "rawSize": 5110964,
+                "date": "14/05/2026",
+                "mimeType": "application/pdf",
+                "stored": true,
+                "tags": [],
+                "desc": "",
+                "meta": {
+                  "auteur": "",
+                  "version": "v1",
+                  "statut": "Validé"
+                },
+                "downloadURL": "http://localhost:3000/api/files/up_1778762122129"
+              }
+            ]
+          },
+          {
+            "id": "D3",
+            "name": "D3- Évaluations",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "D4",
+            "name": "D4- Paie",
+            "type": "folder",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "E",
+        "name": "E- JURIDIQUE ET CONFORMITE",
+        "type": "folder",
+        "children": [
+          {
+            "id": "E1",
+            "name": "E1- Contrats et conventions",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "E2",
+            "name": "E2- Textes réglementaires",
+            "type": "folder",
+            "children": []
+          },
+          {
+            "id": "E3",
+            "name": "E3- Conformité et risques",
+            "type": "folder",
+            "children": []
+          }
+        ]
+      },
+      {
+        "id": "up_1777728034953",
+        "name": "Brevet_d'Etudes_du_Premier_Cycle.pdf",
+        "type": "file",
+        "ext": "pdf",
+        "size": "662.8 Ko",
+        "rawSize": 678685,
+        "date": "02/05/2026",
+        "mimeType": "application/pdf",
+        "stored": true,
+        "tags": [],
+        "desc": "",
+        "meta": {
+          "auteur": "",
+          "version": "v1",
+          "statut": "Validé"
+        }
+      }
+    ]
+  },
+  "updatedAt": "2026-05-14T12:36:34.298Z"
+}

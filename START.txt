@@ -1,0 +1,230 @@
+================================================================================
+  GED PLAISANCE v1.1 — SYNCHRONISÉE ET DISTRIBUÉE
+================================================================================
+
+🎉 BIENVENUE !
+
+Vous venez de recevoir une application GED améliorée avec synchronisation 
+automatique entre navigateurs et sessions.
+
+================================================================================
+  ⚡ DÉMARRAGE EN 5 MINUTES
+================================================================================
+
+1. LANCER LE SERVEUR
+   ─────────────────
+   Ouvrez un terminal et tapez :
+   
+   cd ged-serveur
+   node server.js
+   
+   Vous verrez :
+   ✅ Serveur démarré sur le port 3000
+   
+   ⚠️  NE FERMEZ PAS CE TERMINAL !
+
+2. OUVRIR L'APPLICATION
+   ────────────────────
+   Ouvrez un navigateur (Chrome, Firefox, Safari, Edge) et allez à :
+   
+   http://localhost:3000/ged-serveur/GED_Plaisance_v6.html
+   
+   Ou via fichier :
+   file:///C:/Users/SONIA/Desktop/PLAISANCE DOC/PERSONNEL/MON PROJET/GED PLAISANCE/ged-serveur/GED_Plaisance_v6.html
+
+3. VÉRIFIER QUE ÇA MARCHE
+   ─────────────────────
+   Appuyez sur F12 → Console
+   
+   Vous devriez voir après 2 secondes :
+   ✓ 📥 Démarrage pré-cache des fichiers...
+   ✓ ✅ Pré-cache terminé : X fichiers pré-cachés
+   
+   Si vous voyez ça → C'EST BON ! ✅
+
+4. AJOUTER UN FICHIER
+   ──────────────────
+   Cliquez sur "➕ Ajouter fichier"
+   Choisissez un fichier (photo, PDF, Word, etc.)
+   
+   Le fichier s'ajoute à la GED
+
+5. OUVRIR UN AUTRE NAVIGATEUR
+   ──────────────────────────
+   Firefox (si vous aviez Chrome) ou Chrome Incognito
+   
+   http://localhost:3000/ged-serveur/GED_Plaisance_v6.html
+   
+   Le fichier que vous avez ajouté APPARAÎT ! 🎉
+   
+   → SYNCHRONISATION FONCTIONNE !
+
+================================================================================
+  📖 DOCUMENTATION
+================================================================================
+
+LIRE D'ABORD :
+
+1. QUICK_START.md (5 min)
+   → Guide rapide avec les mêmes étapes ci-dessus + troubleshooting
+
+2. README_v1.1.md (10 min)
+   → Présentation générale, quoi de neuf, statut
+
+3. INDEX.md (3 min)
+   → Navigation centrale vers tous les guides
+
+APPROFONDIR :
+
+4. GUIDE_SYNCHRONISATION.md (15 min)
+   → Explique l'architecture et les choix technologiques
+
+5. GUIDE_TECHNIQUE_IMPLEMENTATION.md (30 min)
+   → Détails du code, optimisations
+
+6. GUIDE_CONFIGURATION_TESTS.md (45 min)
+   → Tests, déploiement cloud, checklist
+
+ANALYSER :
+
+7. RESUME_MODIFICATIONS.md (10 min)
+   → Résumé des changements
+
+8. CHANGELOG.md (5 min)
+   → Changements ligne-par-ligne
+
+9. FICHIERS_CREES.md (5 min)
+   → Liste de tous les fichiers créés/modifiés
+
+================================================================================
+  ❌ ÇA NE MARCHE PAS ?
+================================================================================
+
+ERREUR : "Impossible de se connecter"
+
+   → Le serveur n'est pas lancé ?
+     Ouvrez un AUTRE terminal et tapez :
+     cd ged-serveur
+     node server.js
+
+ERREUR : "localhost:3000 refused"
+
+   → Port 3000 bloqué par le firewall ?
+     Autorisez Node.js dans Windows Defender
+     OU redémarrez le serveur
+
+ERREUR : "Console dit 'Cannot read property transaction'"
+
+   → Normal ! IndexedDB se charge. Attendez 3 secondes et rafraîchissez (F5)
+
+ERREUR : "Console dit 'fetch failed'"
+
+   → Vérifier que SERVER_URL dans le HTML correspond à l'adresse du serveur
+     (ligne ~17 du fichier GED_Plaisance_v6.html)
+
+→ AIDE COMPLÈTE : Voir GUIDE_CONFIGURATION_TESTS.md section "Troubleshooting"
+
+================================================================================
+  🎯 CE QUI A CHANGÉ
+================================================================================
+
+AVANT (v1.0)
+────────────
+❌ Les données n'existaient que sur votre ordinateur
+❌ Changement de navigateur = perte de fichiers
+❌ Pas de synchronisation
+
+APRÈS (v1.1)
+────────────
+✅ Serveur Node.js centralisé
+✅ Synchronisation automatique
+✅ Fichiers pré-cachés à chaque démarrage
+✅ Fonctionne en mode offline (après 1ère visite)
+✅ Accessible depuis plusieurs navigateurs/ordinateurs
+
+================================================================================
+  🚀 DÉPLOIEMENT CLOUD
+================================================================================
+
+Vous pouvez déployer votre app sur le cloud GRATUITEMENT :
+
+OPTION 1 : Render.com (Simple, 5 min)
+─────────────────────────────────────
+1. Allez sur https://render.com
+2. Sign up gratuit
+3. "New Web Service"
+4. Sélectionnez le dossier ged-serveur
+5. Configuration :
+   - Build : npm install
+   - Start : node server.js
+6. Deploy !
+
+Votre app est accessible sur : https://votreapp.onrender.com
+
+→ GUIDE COMPLET : GUIDE_CONFIGURATION_TESTS.md section "Étape 10"
+
+================================================================================
+  💾 FICHIERS IMPORTANTS
+================================================================================
+
+ged-serveur/server.js              ← Serveur (MODIFIÉ)
+ged-serveur/GED_Plaisance_v6.html  ← App (MODIFIÉE)
+ged-serveur/db.json                ← Base de données
+ged-serveur/uploads/               ← Fichiers binaires
+ged-serveur/package.json           ← Dépendances
+
+[Documentation] ← 8 fichiers .md (voir section 📖)
+
+================================================================================
+  ✨ RÉSUMÉ
+================================================================================
+
+Votre GED est maintenant :
+✅ CENTRALISÉE      (serveur Node.js)
+✅ SYNCHRONISÉE     (multi-navigateur)
+✅ RÉSILIENTE       (offline après 1ère visite)
+✅ CLOUD-READY      (prête à déployer)
+✅ DOCUMENTÉE       (7 guides complets)
+
+Prochaine étape ? Lancer le serveur et tester ! 🚀
+
+================================================================================
+  BESOIN D'AIDE ?
+================================================================================
+
+Question : "Par où commencer ?"
+Réponse  : QUICK_START.md (5 min)
+
+Question : "Comment ça fonctionne ?"
+Réponse  : GUIDE_SYNCHRONISATION.md (15 min)
+
+Question : "Je veux déployer sur le cloud"
+Réponse  : GUIDE_CONFIGURATION_TESTS.md (45 min)
+
+Question : "Je veux voir le code détaillé"
+Réponse  : GUIDE_TECHNIQUE_IMPLEMENTATION.md (30 min)
+
+Question : "Qu'est-ce qui a changé ?"
+Réponse  : CHANGELOG.md (5 min)
+
+Question : "Je veux naviguer entre les guides"
+Réponse  : INDEX.md (3 min)
+
+================================================================================
+  BON DÉVELOPPEMENT !
+================================================================================
+
+Votre GED fonctionne. Les données sont synchronisées. C'est tout ce qu'il
+faut pour commencer !
+
+Pour progresser :
+1. Tester l'app (5 min)
+2. Lire la documentation (90 min)
+3. Déployer sur le cloud (30 min)
+4. Profiter ! 🎉
+
+Merci d'utiliser GED Plaisance !
+
+—————————————————————————————————————————————————————————————————————————————
+Mise à jour : 14 mai 2026
+—————————————————————————————————————————————————————————————————————————————

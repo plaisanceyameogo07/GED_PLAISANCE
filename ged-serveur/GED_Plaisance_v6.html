@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>GED Plaisance Archives — v3</title>
+
+<!-- Libraries for rich preview -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- PDF.js — compatible mobile (iOS + Android) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- ═══ API SERVEUR NODE.JS/EXPRESS ═══ -->
+<script>
+  /* ══════════════════════════════════════════════
+     🔧 SEUL RÉGLAGE À FAIRE :
+     Mettez ici l'adresse IP de votre ordinateur
+     si vous voulez accéder depuis un autre appareil.
+     → Sur votre PC : laissez "localhost"
+     → Depuis un autre appareil sur le même Wi-Fi :
+       remplacez par l'IP locale de votre PC
+       (ex: "192.168.1.42")  — voir README ci-dessous
+  ══════════════════════════════════════════════ */
+  const SERVER_URL = 'http://localhost:3000'; //
+
+  /* ──────────────────────────────────────────────
+     Sauvegarde l'arbre TREE sur le serveur Express
+     POST /api/tree  { tree }
+  ────────────────────────────────────────────── */
+  window.fbSaveTree = async function(tree) {
+    const resp = await fetch(`${SERVER_URL}/api/tree`, {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tree })
+    });
+    if (!resp.ok) throw new Error('Sauvegarde arbre échouée : ' + resp.status);
+  };
+
+  /* ──────────────────────────────────────────────
+     Charge l'arbre TREE depuis le serveur
+     GET /api/tree  → { tree: {...} | null }
+  ────────────────────────────────────────────── */
+  window.fbLoadTree = async function() {
+    const resp = await fetch(`${SERVER_URL}/api/tree`);
+    if (!resp.ok) throw new Error('Chargement arbre échoué : ' + resp.status);
+    const data = await resp.json();
+    return data.tree || null;
+  };
+
+  /* ──────────────────────────────────────────────
+     Upload d'un fichier vers le serveur
+     POST /api/files  (multipart/form-data)
+     → { ok: true, fileId }
+  ────────────────────────────────────────────── */
+  window.fbUploadFile = async function(fileId, blob) {
+    const form = new FormData();
+    form.append('fileId', fileId);
+    form.append('file',   blob, fileId);
+    const resp = await fetch(`${SERVER_URL}/api/files`, {
+      method: 'POST',
+      body:   form
+    });
+    if (!resp.ok) throw new Error('Upload fichier échoué : ' + resp.status);
+    // On retourne l'URL de téléchargement (utilisée comme référence dans TREE)
+    return `${SERVER_URL}/api/files/${fileId}`;
+  };
+
+  /* ──────────────────────────────────────────────
+     Télécharge un fichier depuis le serveur
+     GET /api/files/:id  → Blob
+  ────────────────────────────────────────────── */
+  window.fbDownloadFile = async function(downloadURL) {
+    try {
+      const resp = await fetch(downloadURL);
+      if (!resp.ok) return null;
+      return await resp.blob();
+    } catch(e) {
+      console.error('Téléchargement fichier échoué :', e);
+      return null;
+    }
+  };
+
+  /* ──────────────────────────────────────────────
+     Supprime un fichier sur le serveur
+     DELETE /api/files/:id
+  ────────────────────────────────────────────── */
+  window.fbDeleteFile = async function(fileId) {
+    try {
+      await fetch(`${SERVER_URL}/api/files/${fileId}`, { method: 'DELETE' });
+    } catch(e) {
+      // Fichier déjà absent : on ignore
+    }
+  };
+
+  /* ── Vérifie que le serveur est bien accessible au démarrage ── */
+  (async function checkServer() {
+    try {
+      const resp = await fetch(`${SERVER_URL}/api/ping`);
+      if (resp.ok) {
+        window._firebaseReady = true;
+        window.dispatchEvent(new Event('firebase-ready'));
+        console.log('✅ Serveur Express connecté sur', SERVER_URL);
+      } else {
+        throw new Error('ping KO');
+      }
+    } catch(e) {
+      console.warn('⚠ Serveur Express inaccessible sur', SERVER_URL);
+      console.warn('  → Lancez : node server.js dans le dossier ged-serveur/');
+      // On dispatche quand même l'event pour que l'app démarre en mode local
+      window._serverOffline = true;
+      window._firebaseReady = true;
+      window.dispatchEvent(new Event('firebase-ready'));
+    }
+  })();
+</script>
+
+<style>
+/* ═══════════════ RESET & BASE ═══════════════ */
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,sans-serif;background:#edf1f7;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ═══════════════ TOPBAR ═══════════════ */
+#topbar{background:linear-gradient(135deg,#0d2137 0%,#1a3a5c 100%);color:#c8dced;padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:50px;flex-shrink:0;box-shadow:0 2px 12px rgba(0,0,0,.3)}
+#topbar-left{display:flex;align-items:center;gap:12px}
+#topbar-logo{width:32px;height:32px;background:rgba(255,255,255,.12);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+#topbar h1{font-size:14px;font-weight:700;color:#fff;letter-spacing:.04em}
+#topbar p{font-size:10px;color:#5a8ab0;margin-top:1px}
+#topbar-right{display:flex;align-items:center;gap:14px}
+#topbar-right span{font-size:11px;color:#6fa3cc}
+#db-chip{font-size:10px;padding:3px 10px;border-radius:99px;font-weight:600;transition:all .3s}
+#db-chip.ok{background:rgba(34,197,94,.2);color:#22c55e}
+#db-chip.err{background:rgba(239,68,68,.2);color:#ef4444}
+#db-chip.init{background:rgba(111,163,204,.15);color:#6fa3cc}
+
+/* ═══════════════ LAYOUT ═══════════════ */
+#layout{display:flex;flex:1;overflow:hidden}
+
+/* ═══════════════ SIDEBAR ═══════════════ */
+#sidebar{width:260px;min-width:260px;background:#0d2137;display:flex;flex-direction:column;overflow:hidden;box-shadow:3px 0 12px rgba(0,0,0,.2)}
+#srch-wrap{padding:10px;border-bottom:1px solid rgba(255,255,255,.07)}
+#srch-inp{width:100%;padding:7px 10px 7px 30px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:7px;color:#c8dced;font-size:11px;outline:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%234d7aab' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:9px center}
+#srch-inp:focus{border-color:rgba(111,163,204,.5);background-color:rgba(255,255,255,.1)}
+#srch-inp::placeholder{color:#3d6d99}
+#tree-wrap{flex:1;overflow-y:auto;padding:4px 0 8px}
+#tree-wrap::-webkit-scrollbar{width:3px}
+#tree-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+.ti{display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;font-size:11px;color:#7facc8;transition:background .1s;user-select:none;white-space:nowrap}
+.ti:hover{background:rgba(111,163,204,.14);color:#d4e8f5}
+.ti.act{background:rgba(111,163,204,.22);color:#fff;border-right:2px solid #6fa3cc}
+.ti.folder-ti{font-weight:600}
+.ti-tog{width:12px;height:12px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#2d5a7a;transition:transform .15s;flex-shrink:0}
+.ti-tog.open{transform:rotate(90deg)}
+.ti-ind{width:12px;flex-shrink:0}
+.ti-ico{font-size:13px;flex-shrink:0}
+.ti-lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ti-cnt{font-size:9px;color:#2d5a7a;flex-shrink:0;padding-right:4px}
+.ti-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;margin-right:2px}
+.ti-dot.stored{background:#22c55e}
+.ti-dot.sample{background:#5a8ab0}
+.cat-lbl{padding:10px 10px 3px;font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#1e4060;border-top:1px solid rgba(255,255,255,.05);margin-top:4px}
+
+/* ═══════════════ MAIN ═══════════════ */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* ═══════════════ TABS ═══════════════ */
+#tabs{display:flex;background:#fff;border-bottom:1px solid #d8e3ed;flex-shrink:0;box-shadow:0 1px 4px rgba(0,0,0,.05)}
+.tab{padding:0 18px;height:44px;display:flex;align-items:center;font-size:12px;font-weight:500;color:#6b7a8d;cursor:pointer;border-bottom:2px solid transparent;gap:6px;transition:all .15s}
+.tab:hover{color:#0d2137}
+.tab.act{color:#0d2137;border-bottom-color:#0d2137;font-weight:700}
+
+/* ═══════════════ TOOLBAR ═══════════════ */
+#toolbar{padding:8px 14px;background:#fff;border-bottom:1px solid #d8e3ed;display:flex;align-items:center;gap:8px;flex-shrink:0;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+#bc{flex:1;display:flex;align-items:center;gap:4px;font-size:11px;color:#6b7a8d;flex-wrap:wrap;min-width:0;overflow:hidden}
+#bc .bc-item{color:#0d2137;font-weight:600;white-space:nowrap}
+#bc .bc-link{color:#6b7a8d;cursor:pointer;white-space:nowrap}
+#bc .bc-link:hover{color:#0d2137;text-decoration:underline}
+#bc .bc-sep{color:#c8d4e0}
+#toolbar-btns{display:flex;gap:6px;flex-shrink:0}
+
+/* ═══════════════ BUTTONS ═══════════════ */
+.btn{padding:6px 13px;border:1px solid #c8d4e0;border-radius:6px;background:#fff;color:#0d2137;font-size:11px;cursor:pointer;font-weight:500;white-space:nowrap;transition:all .12s;display:inline-flex;align-items:center;gap:5px}
+.btn:hover{background:#e8f0f8;border-color:#6fa3cc}
+.btn.primary{background:#0d2137;color:#fff;border-color:#0d2137}
+.btn.primary:hover{background:#1a3a5c}
+.btn.success{background:#f0fdf4;color:#15803d;border-color:#86efac}
+.btn.danger{background:#fff1f2;color:#991b1b;border-color:#fca5a5}
+.btn.danger:hover{background:#ffe4e6}
+.btn.sm{padding:4px 9px;font-size:10px}
+.btn.icon-btn{padding:6px 8px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+
+/* ═══════════════ CONTENT PANE ═══════════════ */
+#pane{flex:1;display:flex;overflow:hidden}
+#explorer-area{flex:1;overflow-y:auto;padding:14px;min-width:0;display:flex;flex-direction:column;gap:14px}
+#explorer-area::-webkit-scrollbar{width:5px}
+#explorer-area::-webkit-scrollbar-thumb{background:#c8d4e0;border-radius:3px}
+
+/* ═══════════════ UPLOAD ZONE ═══════════════ */
+#upz{border:2px dashed #b8cede;border-radius:10px;padding:18px;text-align:center;cursor:pointer;transition:all .2s;background:#f8fbff;flex-shrink:0}
+#upz:hover,#upz.hover{border-color:#0d2137;background:#edf4fb;transform:scale(1.005)}
+#upz.uploading{border-color:#22c55e;background:#f0fff4}
+#upz-inner{display:flex;align-items:center;justify-content:center;gap:10px}
+#upz-icon{font-size:22px}
+#upz-text{text-align:left}
+#upz-title{font-size:12px;font-weight:700;color:#0d2137}
+#upz-sub{font-size:10px;color:#6b7a8d;margin-top:2px}
+#upz-formats{font-size:10px;color:#9ab0c4;margin-top:3px}
+#prog-wrap{margin-top:10px;display:none}
+#prog-bg{background:#d8e3ed;border-radius:99px;height:5px;overflow:hidden}
+#prog-fill{background:linear-gradient(90deg,#0d2137,#2a7fd4);height:5px;border-radius:99px;width:0%;transition:width .25s}
+#prog-lbl{font-size:10px;color:#6b7a8d;margin-top:4px}
+
+/* ═══════════════ FOLDER HEADER ═══════════════ */
+#folder-hd{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;flex-shrink:0}
+#folder-hd h2{font-size:15px;font-weight:700;color:#0d2137}
+#folder-hd p{font-size:11px;color:#6b7a8d;margin-top:2px}
+
+/* ═══════════════ FILE GRID ═══════════════ */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.fc{background:#fff;border:1px solid #d8e3ed;border-radius:9px;padding:12px 10px 10px;cursor:pointer;transition:all .15s;display:flex;flex-direction:column;align-items:center;gap:6px;text-align:center;position:relative;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.fc:hover{border-color:#0d2137;background:#f5f8ff;box-shadow:0 3px 10px rgba(13,33,55,.1);transform:translateY(-1px)}
+.fc.active{border-color:#2563eb;background:#eff6ff;box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.fc-ico{font-size:28px;line-height:1}
+.fc-name{font-size:10px;color:#1a2a3a;line-height:1.4;word-break:break-word;font-weight:500;max-width:100%}
+.fc-sub{font-size:9px;color:#8b9cad}
+.fc-del{position:absolute;top:5px;right:6px;font-size:11px;color:#c0ccd8;background:#fff;border-radius:4px;padding:1px 4px;cursor:pointer;display:none;line-height:1.2;border:1px solid #e0e8f0}
+.fc:hover .fc-del{display:block}
+.fc-del:hover{color:#dc2626;border-color:#fca5a5}
+.fc-stored{position:absolute;top:5px;left:6px;width:7px;height:7px;border-radius:50%;background:#22c55e}
+.tag-row{display:flex;flex-wrap:wrap;justify-content:center;gap:2px}
+.tp{display:inline-flex;align-items:center;padding:2px 6px;border-radius:99px;font-size:8px;font-weight:600}
+.tp-b{background:#dbeffe;color:#1d4ed8}
+.tp-g{background:#dcfce7;color:#15803d}
+.tp-a{background:#fef3c7;color:#92400e}
+.tp-r{background:#fee2e2;color:#991b1b}
+.tp-p{background:#ede9fe;color:#5b21b6}
+.ext-badge{display:inline-block;padding:2px 7px;border-radius:99px;font-size:8px;font-weight:700;letter-spacing:.04em}
+.empty-folder{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px;color:#8b9cad;gap:8px}
+.empty-folder .ef-ico{font-size:44px;opacity:.18}
+.empty-folder .ef-txt{font-size:12px;font-weight:600}
+.empty-folder .ef-sub{font-size:11px}
+
+/* ═══════════════ PREVIEW PANEL ═══════════════ */
+#preview-panel{background:#fff;border-left:1px solid #d8e3ed;display:none;flex-direction:column;overflow:hidden;width:55%;min-width:420px;flex-shrink:0;box-shadow:-3px 0 12px rgba(0,0,0,.06)}
+#preview-panel.show{display:flex}
+#pv-header{padding:10px 14px;background:#f5f8ff;border-bottom:1px solid #d8e3ed;display:flex;align-items:center;gap:8px;flex-shrink:0}
+#pv-header-info{flex:1;min-width:0}
+#pv-fname{font-size:12px;font-weight:700;color:#0d2137;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pv-fmeta{font-size:10px;color:#6b7a8d;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+#pv-header-btns{display:flex;gap:6px;flex-shrink:0}
+#pv-type-badge{padding:3px 9px;border-radius:99px;font-size:10px;font-weight:700}
+#pv-body{flex:1;overflow:hidden;position:relative;background:#f0f4f8}
+#pv-body.loading::after{content:'Chargement…';position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#6b7a8d;background:#f0f4f8}
+
+/* PDF preview — canvas-based (compatible mobile) */
+#pv-pdf-wrap{width:100%;height:100%;overflow-y:auto;background:#525659;display:flex;flex-direction:column;align-items:center;padding:12px;gap:10px}
+#pv-pdf-wrap::-webkit-scrollbar{width:5px}
+#pv-pdf-wrap::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:3px}
+#pv-pdf-wrap canvas{max-width:100%;border-radius:3px;box-shadow:0 3px 12px rgba(0,0,0,.4)}
+#pv-pdf-toolbar{display:flex;align-items:center;justify-content:center;gap:10px;padding:8px 12px;background:rgba(0,0,0,.35);border-radius:8px;font-size:11px;color:#fff;flex-shrink:0;flex-wrap:wrap}
+#pv-pdf-toolbar button{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);color:#fff;padding:4px 10px;border-radius:5px;cursor:pointer;font-size:11px}
+#pv-pdf-toolbar button:hover{background:rgba(255,255,255,.3)}
+#pv-pdf-toolbar button:disabled{opacity:.35;cursor:default}
+
+/* Image preview */
+#pv-img-wrap{width:100%;height:100%;display:flex;align-items:center;justify-content:center;padding:16px;background:repeating-conic-gradient(#e5eaf0 0% 25%,#f0f4f8 0% 50%) 0 0/20px 20px}
+#pv-img{max-width:100%;max-height:100%;object-fit:contain;border-radius:4px;box-shadow:0 4px 20px rgba(0,0,0,.15)}
+
+/* Word preview */
+#pv-word-wrap{width:100%;height:100%;overflow-y:auto;background:#fff;padding:32px 48px}
+#pv-word-wrap::-webkit-scrollbar{width:5px}
+#pv-word-wrap::-webkit-scrollbar-thumb{background:#d8e3ed;border-radius:3px}
+#pv-word-content{max-width:680px;margin:0 auto;font-size:13px;line-height:1.8;color:#1a2a3a}
+#pv-word-content h1,#pv-word-content h2,#pv-word-content h3{color:#0d2137;margin:16px 0 8px}
+#pv-word-content p{margin:6px 0}
+#pv-word-content table{border-collapse:collapse;width:100%;margin:12px 0}
+#pv-word-content td,#pv-word-content th{border:1px solid #d8e3ed;padding:6px 10px;font-size:12px}
+#pv-word-content th{background:#f0f6ff;font-weight:700}
+#pv-word-content img{max-width:100%;border-radius:4px;margin:8px 0}
+
+/* Excel preview */
+#pv-xl-wrap{width:100%;height:100%;overflow:auto;background:#fff}
+#pv-xl-wrap::-webkit-scrollbar{width:5px;height:5px}
+#pv-xl-wrap::-webkit-scrollbar-thumb{background:#d8e3ed;border-radius:3px}
+#pv-xl-tabs{display:flex;gap:0;background:#f0f4f8;border-bottom:1px solid #d8e3ed;flex-shrink:0;overflow-x:auto;flex-wrap:nowrap}
+#pv-xl-tabs::-webkit-scrollbar{height:3px}
+.xl-tab{padding:7px 14px;font-size:11px;cursor:pointer;white-space:nowrap;border-right:1px solid #d8e3ed;color:#6b7a8d;font-weight:500;transition:background .12s}
+.xl-tab:hover{background:#e8f0f8}
+.xl-tab.active{background:#fff;color:#0d2137;font-weight:700;border-bottom:2px solid #0d2137;margin-bottom:-1px}
+#pv-xl-table-wrap{overflow:auto;flex:1}
+.xl-table{border-collapse:collapse;font-size:11px;min-width:100%}
+.xl-table th{background:#f0f6ff;border:1px solid #d8e3ed;padding:5px 10px;font-weight:700;color:#0d2137;white-space:nowrap;position:sticky;top:0;z-index:1}
+.xl-table td{border:1px solid #e8eef5;padding:4px 10px;white-space:nowrap;color:#1a2a3a}
+.xl-table tr:nth-child(even) td{background:#f8fbff}
+.xl-row-num{background:#f5f8fc!important;color:#8b9cad!important;font-size:9px;text-align:right;user-select:none;min-width:32px}
+
+/* Video/Audio */
+#pv-video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+#pv-audio-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;padding:20px}
+#pv-audio{width:100%;max-width:420px}
+#pv-audio-icon{font-size:60px;opacity:.3}
+
+/* No preview */
+#pv-noprev{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;color:#6b7a8d;padding:24px;text-align:center}
+#pv-noprev .np-ico{font-size:52px;opacity:.25}
+#pv-noprev .np-name{font-size:13px;font-weight:700;color:#0d2137;word-break:break-word}
+#pv-noprev .np-msg{font-size:11px;line-height:1.6}
+
+/* Sample placeholder */
+#pv-sample{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;padding:24px;text-align:center}
+#pv-sample .sp-ico{font-size:52px;opacity:.2}
+#pv-sample .sp-title{font-size:13px;font-weight:700;color:#0d2137}
+#pv-sample .sp-msg{font-size:11px;color:#6b7a8d;line-height:1.6;max-width:280px}
+
+/* Metadata panel */
+#pv-footer{padding:10px 14px;border-top:1px solid #d8e3ed;background:#f9fbfd;flex-shrink:0}
+#pv-tags-row{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;align-items:center}
+#pv-tag-add{display:flex;gap:5px}
+#pv-tag-input{flex:1;padding:4px 8px;border:1px solid #d8e3ed;border-radius:5px;font-size:11px;outline:none;min-width:80px}
+#pv-tag-input:focus{border-color:#6fa3cc}
+.pv-tag{cursor:pointer}
+.pv-tag:hover{opacity:.7}
+
+/* ═══════════════ METADATA SIDEBAR ═══════════════ */
+#meta-sidebar{width:210px;min-width:210px;background:#fff;border-left:1px solid #d8e3ed;overflow-y:auto;padding:12px;display:none;flex-shrink:0}
+#meta-sidebar.show{display:block}
+.ms-head{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8b9cad;margin:12px 0 6px;padding-bottom:4px;border-bottom:1px solid #eef2f7}
+.ms-head:first-child{margin-top:0}
+.ms-row{font-size:11px;color:#1a2a3a;margin-bottom:5px;line-height:1.5}
+.ms-row em{font-style:normal;font-size:10px;color:#8b9cad}
+
+/* ═══════════════ STATUS BAR ═══════════════ */
+#sbar{background:#fff;border-top:1px solid #d8e3ed;padding:5px 14px;display:flex;gap:14px;font-size:10px;color:#8b9cad;flex-shrink:0;align-items:center}
+#sbar b{font-weight:700;color:#0d2137}
+
+/* ═══════════════ LOG & EXPORT ═══════════════ */
+#log-wrap,#exp-wrap{flex:1;overflow-y:auto;padding:14px}
+#log-wrap::-webkit-scrollbar,#exp-wrap::-webkit-scrollbar{width:5px}
+#log-wrap::-webkit-scrollbar-thumb,#exp-wrap::-webkit-scrollbar-thumb{background:#c8d4e0;border-radius:3px}
+.log-day{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#8b9cad;padding:10px 0 4px;border-bottom:1px solid #eef2f7;margin-bottom:4px}
+.log-entry{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f0f4f8;align-items:flex-start}
+.log-time{font-size:10px;color:#a0adb8;width:52px;flex-shrink:0;padding-top:1px}
+.log-ico{width:18px;text-align:center;font-size:13px;flex-shrink:0}
+.log-txt{font-size:11px;color:#1a2a3a;flex:1;line-height:1.5}
+.exp-card{background:#fff;border:1px solid #d8e3ed;border-radius:9px;margin-bottom:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.exp-hd{padding:9px 14px;background:#f5f8ff;border-bottom:1px solid #d8e3ed;display:flex;justify-content:space-between;align-items:center;font-size:12px;font-weight:700;color:#0d2137}
+.exp-body{padding:12px 14px;font-family:'Courier New',monospace;font-size:10px;color:#2a3a4a;line-height:1.8;max-height:180px;overflow-y:auto;white-space:pre}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.stat-card{background:#fff;border:1px solid #d8e3ed;border-radius:8px;padding:12px 10px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.stat-card .sv{font-size:20px;font-weight:800;color:#0d2137}
+.stat-card .sl{font-size:10px;color:#8b9cad;margin-top:2px}
+
+/* ═══════════════ MODALS ═══════════════ */
+.overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;align-items:center;justify-content:center}
+.overlay.show{display:flex}
+.modal{background:#fff;border-radius:12px;width:440px;max-width:95vw;box-shadow:0 12px 40px rgba(0,0,0,.25);overflow:hidden}
+.modal-hd{padding:14px 18px;background:#0d2137;color:#fff;font-size:13px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
+.modal-bd{padding:18px;max-height:70vh;overflow-y:auto}
+.modal-ft{padding:10px 18px;background:#f5f8ff;border-top:1px solid #e0e8f0;display:flex;justify-content:flex-end;gap:8px}
+.f-label{display:block;font-size:11px;font-weight:600;color:#0d2137;margin-bottom:4px;margin-top:12px}
+.f-label:first-child{margin-top:0}
+.f-inp{width:100%;padding:8px 10px;border:1px solid #d8e3ed;border-radius:7px;font-size:11px;outline:none;color:#1a2a3a;font-family:inherit;background:#fff;transition:border .12s}
+.f-inp:focus{border-color:#6fa3cc}
+textarea.f-inp{min-height:64px;resize:vertical}
+.f-hint{font-size:10px;color:#9ab0c4;margin-top:3px}
+.meta-file-card{background:#f0f6ff;border-radius:7px;padding:10px 12px;margin-bottom:4px;font-size:11px;color:#0d2137;display:flex;align-items:center;gap:10px}
+.meta-file-card .mfc-ico{font-size:24px}
+.meta-file-card .mfc-name{font-weight:700;word-break:break-all}
+.meta-file-card .mfc-size{font-size:10px;color:#6b7a8d}
+
+/* ═══════════════ TOAST ═══════════════ */
+#toast{position:fixed;bottom:20px;right:20px;padding:10px 18px;border-radius:8px;font-size:12px;font-weight:600;opacity:0;transform:translateY(8px);transition:all .28s;pointer-events:none;z-index:999;box-shadow:0 4px 14px rgba(0,0,0,.22);max-width:320px}
+#toast.show{opacity:1;transform:translateY(0)}
+#toast.ok{background:#0d2137;color:#fff}
+#toast.good{background:#15803d;color:#fff}
+#toast.err{background:#991b1b;color:#fff}
+
+/* ═══════════════ BADGES ═══════════════ */
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:9px;font-weight:700}
+.badge-ok{background:#dcfce7;color:#15803d}
+.badge-warn{background:#fef3c7;color:#92400e}
+.badge-err{background:#fee2e2;color:#991b1b}
+.badge-info{background:#dbeffe;color:#1d4ed8}
+.badge-gray{background:#f1f5f9;color:#475569}
+
+/* ═══════════════ HELPERS ═══════════════ */
+.hidden{display:none!important}
+.spin{animation:spin 1s linear infinite;display:inline-block}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ═══════════════ BOUTONS ACTION (déplacer/copier) sur les cartes ═══════════════ */
+/* Barre d'icônes qui apparaît en bas de la carte au survol */
+.fc-actions{position:absolute;bottom:5px;left:50%;transform:translateX(-50%);display:none;gap:3px;z-index:2;white-space:nowrap}
+.fc:hover .fc-actions{display:flex}
+/* Chaque mini-bouton d'action */
+.fc-act-btn{font-size:10px;background:#fff;border:1px solid #d8e3ed;border-radius:4px;padding:1px 5px;cursor:pointer;color:#5a8ab0;line-height:1.5;transition:all .12s}
+.fc-act-btn:hover{background:#e8f0f8;border-color:#6fa3cc;color:#0d2137}
+.fc-act-btn.move:hover{background:#fef3c7;border-color:#f59e0b;color:#92400e}
+.fc-act-btn.copy:hover{background:#dcfce7;border-color:#4ade80;color:#15803d}
+
+/* ═══════════════ MODAL DÉPLACER / COPIER ═══════════════ */
+/* Liste scrollable des dossiers disponibles */
+#mv-folder-list{max-height:300px;overflow-y:auto;border:1px solid #d8e3ed;border-radius:8px;padding:4px 0;background:#fff;margin-top:2px}
+#mv-folder-list::-webkit-scrollbar{width:4px}
+#mv-folder-list::-webkit-scrollbar-thumb{background:#c8d4e0;border-radius:2px}
+/* Une ligne = un dossier dans le sélecteur */
+.mv-row{display:flex;align-items:center;gap:7px;padding:6px 10px;cursor:pointer;font-size:11px;color:#1a2a3a;transition:background .1s;border-radius:5px;margin:1px 4px;user-select:none}
+.mv-row:hover{background:#edf4fb}
+.mv-row.mv-sel{background:#dbeffe;color:#1d4ed8;font-weight:600;border:1px solid #93c5fd}
+/* Dossier courant (origine de l'élément) : grisé, non cliquable */
+.mv-row.mv-origin{opacity:.45;cursor:not-allowed;pointer-events:none}
+.mv-badge{font-size:9px;background:#f1f5f9;color:#475569;padding:1px 6px;border-radius:99px;font-weight:600;margin-left:auto;flex-shrink:0}
+/* Aperçu de l'élément qu'on va déplacer/copier */
+#mv-item-preview{background:#f5f8ff;border:1px solid #d8e3ed;border-radius:7px;padding:9px 12px;margin-bottom:10px;display:flex;align-items:center;gap:10px;font-size:11px;color:#0d2137}
+#mv-item-preview .mv-ico{font-size:22px}
+#mv-item-preview .mv-info b{display:block;font-weight:700;word-break:break-all}
+#mv-item-preview .mv-info span{font-size:10px;color:#6b7a8d}
+</style>
+</head>
+<body>
+
+<!-- Topbar -->
+<div id="topbar">
+  <div id="topbar-left">
+    <div id="topbar-logo">📂</div>
+    <div>
+      <h1>Plaisance GED — v3</h1>
+      <p>Prévisualisation native par type de fichier</p>
+    </div>
+  </div>
+  <div id="topbar-right">
+    <span>👤 Sonia — Administratrice</span>
+    <div id="db-chip" class="init">⏳ Init…</div>
+    <span id="tb-date"></span>
+  </div>
+</div>
+
+<!-- Layout -->
+<div id="layout">
+
+  <!-- Sidebar -->
+  <div id="sidebar">
+    <div id="srch-wrap">
+      <input type="text" id="srch-inp" placeholder="Rechercher fichiers, tags…" oninput="filterTree(this.value)"/>
+    </div>
+    <div id="tree-wrap"></div>
+  </div>
+
+  <!-- Main -->
+  <div id="main">
+
+    <!-- Tabs -->
+    <div id="tabs">
+      <div class="tab act" data-tab="explorer" onclick="switchTab('explorer',this)">📂 Explorateur</div>
+      <div class="tab" data-tab="log" onclick="switchTab('log',this)">📋 Journal <span id="log-badge" style="background:#f1f5f9;color:#475569;padding:1px 6px;border-radius:99px;font-size:9px;font-weight:700;margin-left:2px">0</span></div>
+      <div class="tab" data-tab="export" onclick="switchTab('export',this)">⬇ Export</div>
+    </div>
+
+    <!-- Toolbar (explorer only) -->
+    <div id="toolbar">
+      <div id="bc"></div>
+      <div id="toolbar-btns">
+        <button class="btn sm" onclick="showMeta()">🏷 Métadonnées</button>
+        <button class="btn sm" onclick="showFolderModal()">📁 Nouveau dossier</button>
+        <button class="btn sm primary" onclick="triggerUpload()">⬆ Importer</button>
+      </div>
+    </div>
+
+    <!-- Pane: explorer + preview + meta -->
+    <div id="pane">
+
+      <!-- Explorer area (left) -->
+      <div id="explorer-area">
+        <!-- Upload zone -->
+        <div id="upz" onclick="triggerUpload()">
+          <div id="upz-inner">
+            <div id="upz-icon">📤</div>
+            <div id="upz-text">
+              <div id="upz-title">Glissez-déposez vos fichiers ici</div>
+              <div id="upz-sub">ou cliquez pour parcourir depuis votre ordinateur</div>
+              <div id="upz-formats">PDF · Word · Excel · Images · Vidéo · Audio · et tout type de fichier</div>
+            </div>
+          </div>
+          <div id="prog-wrap">
+            <div id="prog-bg"><div id="prog-fill"></div></div>
+            <div id="prog-lbl"></div>
+          </div>
+        </div>
+        <!-- Folder header -->
+        <div id="folder-hd">
+          <div>
+            <h2 id="fh-name">–</h2>
+            <p id="fh-sub">–</p>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0"></div>
+        </div>
+        <!-- Grid -->
+        <div id="file-grid"></div>
+      </div>
+
+      <!-- Preview panel (right) -->
+      <div id="preview-panel">
+        <div id="pv-header">
+          <div id="pv-header-info">
+            <div id="pv-fname">–</div>
+            <div id="pv-fmeta"></div>
+          </div>
+          <div id="pv-header-btns">
+            <span id="pv-type-badge" class="ext-badge">–</span>
+            <button class="btn sm" onclick="if(selFile)showMoveModal(selFile.id,'move')" title="Déplacer ce fichier">✂</button>
+            <button class="btn sm" onclick="if(selFile)showMoveModal(selFile.id,'copy')" title="Copier ce fichier">⧉</button>
+            <button class="btn sm icon-btn" onclick="dlFile()" id="pv-dl-btn" title="Télécharger">⬇</button>
+            <button class="btn sm icon-btn danger" onclick="deleteFilePv()" title="Supprimer">🗑</button>
+            <button class="btn sm icon-btn" onclick="closePreview()" title="Fermer">✕</button>
+          </div>
+        </div>
+        <div id="pv-body" class="loading">
+          <!-- dynamic content injected here -->
+        </div>
+        <div id="pv-footer">
+          <div id="pv-tags-row"></div>
+          <div id="pv-tag-add">
+            <input type="text" id="pv-tag-input" placeholder="Ajouter un tag…" onkeydown="if(event.key==='Enter')addTagPv()"/>
+            <button class="btn sm primary" onclick="addTagPv()">+ Tag</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metadata sidebar -->
+      <div id="meta-sidebar">
+        <!-- filled dynamically -->
+      </div>
+
+    </div><!-- /pane -->
+
+    <!-- Status bar -->
+    <div id="sbar">
+      <span>Dossiers : <b id="sb-d">0</b></span>
+      <span>Fichiers : <b id="sb-f">0</b></span>
+      <span>Sélection : <b id="sb-sel">–</b></span>
+      <span>Stockage : <b id="sb-size">0 o</b></span>
+      <span id="sb-log-stat" style="margin-left:auto">Journal : <b id="sact">0</b> entrée(s)</span>
+    </div>
+
+  </div><!-- /main -->
+
+</div><!-- /layout -->
+
+<!-- Hidden file input -->
+<input type="file" id="file-input" multiple accept="*/*" style="display:none" onchange="handleFileInput(this.files)"/>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- Modal: Nouveau dossier -->
+<div class="overlay" id="modal-folder">
+  <div class="modal">
+    <div class="modal-hd">📁 Nouveau dossier <button class="btn sm" style="color:#fff;border-color:rgba(255,255,255,.3);background:transparent" onclick="closeModal('modal-folder')">✕</button></div>
+    <div class="modal-bd">
+      <label class="f-label">Nom du dossier *</label>
+      <input class="f-inp" type="text" id="fn-name" placeholder="Ex : A8- Archivage numérique"/>
+      <p class="f-hint">Créé dans le dossier actuellement affiché.</p>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModal('modal-folder')">Annuler</button>
+      <button class="btn primary" onclick="confirmFolder()">✓ Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Métadonnées upload -->
+<div class="overlay" id="modal-meta">
+  <div class="modal">
+    <div class="modal-hd"><span id="meta-modal-title">✏ Métadonnées</span> <button class="btn sm" style="color:#fff;border-color:rgba(255,255,255,.3);background:transparent" onclick="skipMeta()">✕ Passer</button></div>
+    <div class="modal-bd">
+      <div class="meta-file-card" id="mfc"></div>
+      <div style="font-size:10px;color:#8b9cad;margin-bottom:8px" id="meta-counter-lbl"></div>
+      <label class="f-label">Auteur / Service</label>
+      <input class="f-inp" type="text" id="m-auteur" placeholder="Ex : Service RH"/>
+      <label class="f-label">Statut</label>
+      <select class="f-inp" id="m-statut">
+        <option>Brouillon</option><option>En cours</option>
+        <option>Validé</option><option>Approuvé</option>
+        <option>Archivé</option><option>En vigueur</option>
+      </select>
+      <label class="f-label">Tags (séparés par virgule)</label>
+      <input class="f-inp" type="text" id="m-tags" placeholder="Ex : Finance, 2024, Rapport"/>
+      <label class="f-label">Description</label>
+      <textarea class="f-inp" id="m-desc" placeholder="Résumé bref du document…"></textarea>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="skipMeta()">Passer</button>
+      <button class="btn primary" onclick="saveMeta()">✓ Enregistrer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     Modal : Déplacer / Copier un fichier ou dossier
+     Ouvert par showMoveModal(itemId, 'move') ou showMoveModal(itemId, 'copy')
+════════════════════════════════════════════════ -->
+<div class="overlay" id="modal-move">
+  <div class="modal">
+    <!-- En-tête : titre change selon l'opération (Déplacer ou Copier) -->
+    <div class="modal-hd">
+      <span id="mv-title">✂ Déplacer</span>
+      <button class="btn sm" style="color:#fff;border-color:rgba(255,255,255,.3);background:transparent" onclick="closeModal('modal-move')">✕</button>
+    </div>
+    <div class="modal-bd">
+      <!-- Aperçu de l'élément concerné -->
+      <div id="mv-item-preview">
+        <div class="mv-ico" id="mv-ico">📄</div>
+        <div class="mv-info">
+          <b id="mv-item-name">–</b>
+          <span id="mv-item-type">–</span>
+        </div>
+      </div>
+      <!-- Instructions -->
+      <p class="f-label" style="margin-top:0;margin-bottom:5px">Choisissez le dossier de destination :</p>
+      <!-- Liste des dossiers (remplie dynamiquement par buildMvFolderList) -->
+      <div id="mv-folder-list"></div>
+      <p class="f-hint" style="margin-top:6px" id="mv-hint">Cliquez sur un dossier pour le sélectionner, puis confirmez.</p>
+    </div>
+    <div class="modal-ft">
+      <button class="btn" onclick="closeModal('modal-move')">Annuler</button>
+      <!-- Le libellé du bouton change aussi : "Déplacer ici" ou "Copier ici" -->
+      <button class="btn primary" id="mv-confirm-btn" onclick="confirmMoveOrCopy()" disabled>✂ Déplacer ici</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   CONFIG & STATE
+═══════════════════════════════════════════════ */
+const DB_NAME  = 'PlaisanceGED_v3';
+const DB_VER   = 1;
+const IDB_STORE = 'blobs';
+const LS_TREE  = 'ged3_tree';
+const LS_LOG   = 'ged3_log';
+const TC = ['tp-b','tp-g','tp-a','tp-r','tp-p'];
+
+let db = null;
+let TREE = null;
+let openF   = new Set(['root','A','B','C','D','E']);
+let curNode = null, curPath = [], selFile = null;
+let metaOpen = false, previewOpen = false;
+let curTab   = 'explorer';
+let activity = [];
+let pending  = [], pendingIdx = 0;
+let blobURLs = {};
+let idCtr = Date.now();
+
+/* ═══════════════════════════════════════════════
+   DEFAULT TREE
+═══════════════════════════════════════════════ */
+const DEFAULT_TREE = {
+  id:'root',name:'DOSSIER ARCHIVES',type:'folder',children:[
+    {id:'f0',name:'CV.YAMEOGO_Plaisance_Archive.pdf',type:'file',ext:'pdf',size:'245 Ko',date:'12/01/2024',tags:['CV','RH'],stored:false,meta:{auteur:'Y. Plaisance',version:'v2',statut:'Validé'},desc:'Curriculum Vitae — Plaisance YAMEOGO'},
+    {id:'f1',name:'Gestion_des_documents.docx',type:'file',ext:'docx',size:'38 Ko',date:'08/03/2024',tags:['Procédure'],stored:false,meta:{auteur:'Service Admin',version:'v1',statut:'En cours'},desc:'Procédure de gestion et classement des documents'},
+    {id:'f2',name:'Projets_réalisés.docx',type:'file',ext:'docx',size:'52 Ko',date:'15/02/2024',tags:['Projet','Bilan'],stored:false,meta:{auteur:'Direction',version:'v1',statut:'Finalisé'},desc:'Rapport des projets réalisés 2023-2024'},
+    {id:'A',name:'A- ADMINISTRATION GENERALE',type:'folder',children:[
+      {id:'A1',name:'A1- Gestion des courriers',type:'folder',children:[
+        {id:'A11',name:'A1.1- Courrier arrivée',type:'folder',children:[]},
+        {id:'A12',name:'A1.2- Courrier départ',type:'folder',children:[]},
+        {id:'A13',name:'A1.3- Courrier officiel',type:'folder',children:[]}
+      ]},
+      {id:'A2',name:'A2- Relations partenaires',type:'folder',children:[
+        {id:'A21',name:'A2.1- Partenaire X',type:'folder',children:[]},
+        {id:'A22',name:'A2.2- Partenaire Y',type:'folder',children:[]}
+      ]},
+      {id:'A3',name:'A3- Audit et contrôle interne',type:'folder',children:[
+        {id:'A31',name:'A3.1- Audit interne',type:'folder',children:[]},
+        {id:'A32',name:'A3.2- Audit externe',type:'folder',children:[]}
+      ]},
+      {id:'A4',name:'A4- Support logistique',type:'folder',children:[]},
+      {id:'A5',name:'A5- Communication et marketing',type:'folder',children:[]},
+      {id:'A6',name:'A6- Ressources humaines',type:'folder',children:[
+        {id:'A6c',name:'courant',type:'folder',children:[
+          {id:'A6f1',name:'Untitled_document_v01.docx',type:'file',ext:'docx',size:'12 Ko',date:'20/04/2024',tags:['RH','Brouillon'],stored:false,meta:{auteur:'Service RH',version:'v01',statut:'Brouillon'},desc:'Document RH en cours'},
+          {id:'A6f2',name:'Untitled_spreadsheet.xlsx',type:'file',ext:'xlsx',size:'8 Ko',date:'20/04/2024',tags:['RH'],stored:false,meta:{auteur:'Service RH',version:'v01',statut:'Brouillon'},desc:'Tableau de suivi RH'}
+        ]}
+      ]},
+      {id:'A7',name:'A7- Gestion financière et comptable',type:'folder',children:[]}
+    ]},
+    {id:'B',name:'B- PROJETS ET PROGRAMMES',type:'folder',children:[
+      {id:'B1',name:'B1- Projets en cours',type:'folder',children:[
+        {id:'B11',name:'B1.1- Projet Alpha',type:'folder',children:[]},
+        {id:'B12',name:'B1.2- Projet Beta',type:'folder',children:[]}
+      ]},
+      {id:'B2',name:'B2- Projets archivés',type:'folder',children:[]},
+      {id:'B3',name:'B3- Rapports de suivi',type:'folder',children:[]}
+    ]},
+    {id:'C',name:'C- FINANCES ET COMPTABILITE',type:'folder',children:[
+      {id:'C1',name:'C1- Budgets',type:'folder',children:[]},
+      {id:'C2',name:'C2- Factures',type:'folder',children:[]},
+      {id:'C3',name:'C3- États financiers',type:'folder',children:[
+        {id:'C31',name:'C3.1- Bilans',type:'folder',children:[]},
+        {id:'C32',name:'C3.2- Comptes de résultat',type:'folder',children:[]}
+      ]}
+    ]},
+    {id:'D',name:'D- RESSOURCES HUMAINES',type:'folder',children:[
+      {id:'D1',name:'D1- Contrats de travail',type:'folder',children:[]},
+      {id:'D2',name:'D2- Formations',type:'folder',children:[]},
+      {id:'D3',name:'D3- Évaluations',type:'folder',children:[]},
+      {id:'D4',name:'D4- Paie',type:'folder',children:[]}
+    ]},
+    {id:'E',name:'E- JURIDIQUE ET CONFORMITE',type:'folder',children:[
+      {id:'E1',name:'E1- Contrats et conventions',type:'folder',children:[]},
+      {id:'E2',name:'E2- Textes réglementaires',type:'folder',children:[]},
+      {id:'E3',name:'E3- Conformité et risques',type:'folder',children:[]}
+    ]}
+  ]
+};
+
+/* ═══════════════════════════════════════════════
+   PERSISTENCE
+═══════════════════════════════════════════════ */
+function loadData(){
+  // Chargement local immédiat (affichage instantané, même hors-ligne)
+  try { const s=localStorage.getItem(LS_TREE); if(s) TREE=JSON.parse(s); else TREE=JSON.parse(JSON.stringify(DEFAULT_TREE)); }
+  catch(e){ TREE=JSON.parse(JSON.stringify(DEFAULT_TREE)); }
+  try { const s=localStorage.getItem(LS_LOG); if(s) activity=JSON.parse(s); }
+  catch(e){ activity=[]; }
+}
+
+/**
+ * Appelé après l'init Firebase : tente de charger l'arbre depuis Firestore.
+ * Si Firestore a une version plus récente, elle remplace le cache local.
+ */
+async function syncTreeFromCloud(){
+  if(!window.fbLoadTree) return;
+  try{
+    document.getElementById('db-chip').textContent='⏳ Sync cloud…';
+    const cloudTree = await window.fbLoadTree();
+    if(cloudTree){
+      TREE = cloudTree;
+      // Met à jour le cache local avec la version cloud
+      try{ localStorage.setItem(LS_TREE, JSON.stringify(TREE)); }catch(e){}
+      renderExplorer(); buildTree(); updateSizeBar();
+      logIt('☁','Données chargées depuis le serveur Express');
+      toast('✅ Synchronisé avec le serveur','good');
+    } else {
+      // Première utilisation : on pousse l'arbre local vers Firestore
+      await window.fbSaveTree(TREE);
+      logIt('☁','Structure initiale envoyée vers le cloud');
+    }
+  }catch(e){
+    console.warn('syncTreeFromCloud échoué :', e);
+    toast('⚠ Serveur indisponible — mode local','err');
+  }
+}
+function saveTree(){
+  // 1. Sauvegarde locale (cache rapide — reste en cas de perte réseau)
+  try{ localStorage.setItem(LS_TREE,JSON.stringify(TREE)); }catch(e){}
+  // 2. Synchronisation distante vers Firestore (si Firebase est prêt)
+  if(window.fbSaveTree){
+    window.fbSaveTree(TREE).catch(err=>{
+      console.warn('Sync Firestore échouée (données locales préservées) :', err);
+      toast('⚠ Sync serveur échouée — données sauvées en local','err');
+    });
+  }
+}
+function saveLog(){
+  try{ localStorage.setItem(LS_LOG,JSON.stringify(activity.slice(0,300))); }catch(e){}
+  const el=document.getElementById('sact'); if(el) el.textContent=activity.length;
+  const lb=document.getElementById('log-badge'); if(lb) lb.textContent=activity.length;
+}
+
+/* ═══════════════════════════════════════════════
+   IndexedDB
+═══════════════════════════════════════════════ */
+function initDB(){
+  return new Promise((res,rej)=>{
+    const req=indexedDB.open(DB_NAME,DB_VER);
+    req.onupgradeneeded=e=>{ e.target.result.createObjectStore(IDB_STORE,{keyPath:'id'}); };
+    req.onsuccess=e=>{ db=e.target.result; res(db); };
+    req.onerror=()=>rej(req.error);
+  });
+}
+function idbPut(id,blob){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(IDB_STORE,'readwrite');
+    tx.objectStore(IDB_STORE).put({id,blob}).onsuccess=res;
+    tx.onerror=()=>rej();
+  });
+}
+
+/**
+ * Sauvegarde un fichier : d'abord en IndexedDB (local/rapide),
+ * puis envoie vers Firebase Storage (cloud/partagé).
+ * Stocke l'URL de téléchargement dans le nœud TREE correspondant.
+ */
+async function saveFile(nodeId, blob){
+  // 1. Sauvegarde locale IndexedDB
+  await idbPut(nodeId, blob);
+  // 2. Upload vers Firebase Storage (si disponible)
+  if(window.fbUploadFile){
+    try{
+      const url = await window.fbUploadFile(nodeId, blob);
+      // Mémorise l'URL dans le nœud TREE pour les autres sessions
+      const r = find(nodeId, TREE);
+      if(r){ r.node.downloadURL = url; saveTree(); }
+      console.log('☁ Fichier uploadé :', url);
+    }catch(e){
+      console.warn('Upload Firebase Storage échoué :', e);
+      toast('⚠ Upload serveur échoué — fichier en local uniquement','err');
+    }
+  }
+}
+
+function idbGet(id){
+  return new Promise((res,rej)=>{
+    const tx=db.transaction(IDB_STORE,'readonly');
+    const r=tx.objectStore(IDB_STORE).get(id);
+    r.onsuccess=()=>res(r.result?r.result.blob:null);
+    r.onerror=()=>rej();
+  });
+}
+
+/**
+ * Récupère le contenu d'un fichier :
+ * 1. Essaie d'abord IndexedDB (local, instantané)
+ * 2. Si absent, télécharge depuis Firebase Storage via l'URL stockée dans TREE
+ */
+async function getFile(nodeId){
+  // 1. Cache local
+  let blob = null;
+  try{ blob = await idbGet(nodeId); }catch(e){}
+  if(blob) return blob;
+  // 2. Fallback cloud
+  const r = find(nodeId, TREE);
+  if(r && r.node.downloadURL && window.fbDownloadFile){
+    try{
+      blob = await window.fbDownloadFile(r.node.downloadURL);
+      if(blob){
+        // Met en cache local pour les prochains accès
+        await idbPut(nodeId, blob);
+      }
+      return blob;
+    }catch(e){
+      console.warn('Téléchargement Firebase échoué :', e);
+    }
+  }
+  return null;
+}
+function idbDel(id){ return new Promise((res,rej)=>{ const tx=db.transaction(IDB_STORE,'readwrite'); tx.objectStore(IDB_STORE).delete(id).onsuccess=res; tx.onerror=()=>rej(); }); }
+async function idbSize(){ return new Promise(res=>{ const tx=db.transaction(IDB_STORE,'readonly'); const r=tx.objectStore(IDB_STORE).getAll(); r.onsuccess=()=>res((r.result||[]).reduce((s,x)=>s+(x.blob?x.blob.size:0),0)); r.onerror=()=>res(0); }); }
+
+/* ═══════════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════════ */
+function find(id,node){ if(node.id===id)return{node,path:[node]}; if(node.children){for(const c of node.children){const r=find(id,c);if(r)return{node:r.node,path:[node,...r.path]};}} return null; }
+function findParent(id,node){ if(node.children){for(const c of node.children){if(c.id===id)return node;const r=findParent(id,c);if(r)return r;}} return null; }
+
+function ico(n){
+  if(n.type==='folder')return'📁';
+  const e=(n.ext||'').toLowerCase();
+  if(e==='pdf')return'📄';
+  if(['doc','docx'].includes(e))return'📝';
+  if(['xls','xlsx','csv'].includes(e))return'📊';
+  if(['jpg','jpeg','png','gif','webp','svg','bmp','tiff'].includes(e))return'🖼';
+  if(['mp4','avi','mov','mkv','webm'].includes(e))return'🎬';
+  if(['mp3','wav','ogg','m4a','flac'].includes(e))return'🎵';
+  if(['zip','rar','7z','tar','gz'].includes(e))return'🗜';
+  if(['txt','md','log'].includes(e))return'📃';
+  if(['ppt','pptx'].includes(e))return'📊';
+  return'📎';
+}
+
+function extStyle(ext){
+  const e=(ext||'').toLowerCase();
+  const map={pdf:'#fee2e2:#991b1b',docx:'#dbeffe:#1d4ed8',doc:'#dbeffe:#1d4ed8',xlsx:'#dcfce7:#15803d',xls:'#dcfce7:#15803d',csv:'#dcfce7:#15803d',txt:'#f1f5f9:#475569',md:'#f1f5f9:#475569',png:'#ede9fe:#5b21b6',jpg:'#ede9fe:#5b21b6',jpeg:'#ede9fe:#5b21b6',gif:'#ede9fe:#5b21b6',webp:'#ede9fe:#5b21b6',svg:'#ede9fe:#5b21b6',mp4:'#fef3c7:#92400e',avi:'#fef3c7:#92400e',mp3:'#fce7f3:#9d174d',wav:'#fce7f3:#9d174d',zip:'#f1f5f9:#475569',pptx:'#fef3c7:#92400e',ppt:'#fef3c7:#92400e'};
+  const c=(map[e]||'#f1f5f9:#475569').split(':');
+  return{bg:c[0],col:c[1]};
+}
+function extBadge(ext){ const s=extStyle(ext); return`<span class="ext-badge" style="background:${s.bg};color:${s.col}">${(ext||'–').toUpperCase()}</span>`; }
+
+function fmtSize(b){ if(b<1024)return b+' o'; if(b<1048576)return(b/1024).toFixed(1)+' Ko'; return(b/1048576).toFixed(1)+' Mo'; }
+function esc(s){ return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function isImg(e){ return['jpg','jpeg','png','gif','webp','svg','bmp'].includes((e||'').toLowerCase()); }
+function isPDF(e){ return(e||'').toLowerCase()==='pdf'; }
+function isWord(e){ return['doc','docx'].includes((e||'').toLowerCase()); }
+function isXL(e){ return['xls','xlsx','csv'].includes((e||'').toLowerCase()); }
+function isVideo(e){ return['mp4','avi','mov','mkv','webm','ogv'].includes((e||'').toLowerCase()); }
+function isAudio(e){ return['mp3','wav','ogg','m4a','flac','opus'].includes((e||'').toLowerCase()); }
+
+function logIt(ic,txt){
+  const d=new Date();
+  activity.unshift({icon:ic,text:txt,time:d.toTimeString().slice(0,8),date:d.toLocaleDateString('fr-FR')});
+  if(activity.length>300)activity.pop();
+  saveLog();
+}
+
+function toast(msg,type='ok'){
+  const t=document.getElementById('toast');
+  t.className='show '+type; t.textContent=msg;
+  clearTimeout(t._t); t._t=setTimeout(()=>t.className='',3000);
+}
+
+function tagPillNode(t,i){ return`<span class="tp ${TC[i%TC.length]}">${esc(t)}</span>`; }
+function tagPillRemovable(t,i,fid){ return`<span class="tp pv-tag ${TC[i%TC.length]}" title="Supprimer ce tag" onclick="removeTag('${fid}','${esc(t)}')">${esc(t)} ×</span>`; }
+
+async function updateSizeBar(){
+  /* CORRECTION Bug 3 — garde-fou si IndexedDB n'est pas encore prête */
+  if(!db) return;
+  try {
+    const sz = await idbSize();
+    const el = document.getElementById('sb-size');
+    if(el) el.textContent = fmtSize(sz);
+  } catch(e) {
+    console.warn('updateSizeBar: impossible de lire la taille IndexedDB', e);
+  }
+}
+
+function countAll(node){ let f=0,d=0; if(node.type==='file')f++; else{d++;if(node.children)for(const c of node.children){const r=countAll(c);f+=r.f;d+=r.d;}} return{f,d}; }
+
+/* ═══════════════════════════════════════════════
+   TREE RENDERING
+═══════════════════════════════════════════════ */
+function buildTree(){
+  function render(n,depth){
+    const pad=depth*14;
+    if(n.type==='folder'){
+      const hasC=n.children&&n.children.length>0;
+      const isO=openF.has(n.id), isA=curNode&&n.id===curNode.id;
+      let h=`<div class="ti folder-ti${isA?' act':''}" onclick="navTo('${n.id}')" style="padding-left:${10+pad}px">
+        ${hasC?`<div class="ti-tog${isO?' open':''}" onclick="event.stopPropagation();togF('${n.id}')">▶</div>`:`<div class="ti-ind"></div>`}
+        <span class="ti-ico">📁</span>
+        <span class="ti-lbl">${n.name}</span>
+        <span class="ti-cnt">${(n.children||[]).length}</span>
+      </div>`;
+      if(isO&&hasC)for(const c of n.children)h+=render(c,depth+1);
+      return h;
+    } else {
+      const isA=selFile&&n.id===selFile.id;
+      return`<div class="ti${isA?' act':''}" onclick="pickFile('${n.id}')" style="padding-left:${10+pad+14}px">
+        <span class="ti-ico" style="font-size:11px">${ico(n)}</span>
+        <span class="ti-lbl" style="font-size:10px">${n.name}</span>
+        <div class="ti-dot ${n.stored?'stored':'sample'}" title="${n.stored?'Fichier importé':'Fichier exemple'}"></div>
+      </div>`;
+    }
+  }
+  document.getElementById('tree-wrap').innerHTML=render(TREE,0);
+}
+
+function togF(id){ openF.has(id)?openF.delete(id):openF.add(id); buildTree(); }
+
+function navTo(id){
+  const r=find(id,TREE); if(!r)return;
+  curNode=r.node; curPath=r.path; openF.add(id); selFile=null;
+  closePreview(); renderExplorer(); buildTree();
+  document.getElementById('sb-sel').textContent='–';
+  logIt('📂',`Dossier ouvert : <b>${r.node.name}</b>`);
+}
+
+/* ═══════════════════════════════════════════════
+   EXPLORER RENDERING
+═══════════════════════════════════════════════ */
+function renderBreadcrumb(){
+  const parts=curPath.map((n,i)=>
+    i===curPath.length-1
+      ?`<span class="bc-item">${n.name}</span>`
+      :`<span class="bc-link" onclick="navTo('${n.id}')">${n.name}</span>`
+  );
+  document.getElementById('bc').innerHTML=parts.join('<span class="bc-sep">›</span>');
+}
+
+function renderExplorer(){
+  if(curTab!=='explorer')return;
+  const node=curNode||TREE;
+  renderBreadcrumb();
+  const folders=(node.children||[]).filter(c=>c.type==='folder');
+  const files=(node.children||[]).filter(c=>c.type==='file');
+  document.getElementById('fh-name').textContent=node.name;
+  document.getElementById('fh-sub').textContent=`${folders.length} dossier(s) · ${files.length} fichier(s)`;
+  document.getElementById('sb-d').textContent=folders.length;
+  document.getElementById('sb-f').textContent=files.length;
+
+  if(!(node.children||[]).length){
+    document.getElementById('file-grid').innerHTML=
+      `<div class="empty-folder"><div class="ef-ico">📂</div><div class="ef-txt">Dossier vide</div><div class="ef-sub">Glissez des fichiers ici ou cliquez sur Importer</div></div>`;
+    return;
+  }
+
+  let h='<div class="grid">';
+  for(const c of node.children){
+    const isSel=selFile&&selFile.id===c.id;
+    const sub=c.type==='folder'?`${(c.children||[]).length} élém.`:`${c.size||''} · ${c.date||''}`;
+    const tagsH=(c.tags||[]).map((t,i)=>tagPillNode(t,i)).join('');
+    h+=`<div class="fc${isSel?' active':''}" onclick="${c.type==='folder'?`navTo('${c.id}')`:`pickFile('${c.id}')`}">
+      ${c.stored?'<div class="fc-stored" title="Fichier importé"></div>':''}
+      <div class="fc-del" title="Supprimer" onclick="event.stopPropagation();del('${c.id}')">✕</div>
+      <div class="fc-ico">${ico(c)}</div>
+      <div class="fc-name">${esc(c.name)}</div>
+      <div class="fc-sub">${sub}</div>
+      ${c.type==='file'?extBadge(c.ext):''}
+      ${tagsH?`<div class="tag-row">${tagsH}</div>`:''}
+      <div class="fc-actions">
+        <span class="fc-act-btn move" title="Déplacer" onclick="event.stopPropagation();showMoveModal('${c.id}','move')">✂</span>
+        <span class="fc-act-btn copy" title="Copier"   onclick="event.stopPropagation();showMoveModal('${c.id}','copy')">⧉</span>
+      </div>
+    </div>`;
+  }
+  h+='</div>';
+  document.getElementById('file-grid').innerHTML=h;
+}
+
+/* ═══════════════════════════════════════════════
+   FILE SELECTION & PREVIEW
+═══════════════════════════════════════════════ */
+function pickFile(id){
+  const r=find(id,TREE); if(!r||r.node.type==='folder')return;
+  selFile=r.node;
+  document.getElementById('sb-sel').textContent=selFile.name;
+  logIt('👁',`Consulté : <b>${selFile.name}</b>`);
+  renderExplorer(); buildTree();
+  openPreview(selFile);
+}
+
+function openPreview(f){
+  previewOpen=true;
+  const panel=document.getElementById('preview-panel');
+  panel.classList.add('show');
+  // Header
+  document.getElementById('pv-fname').textContent=f.name;
+  const stBadge=f.meta&&f.meta.statut?` · <span class="badge ${badgeCls(f.meta.statut)}">${f.meta.statut}</span>`:'';
+  document.getElementById('pv-fmeta').innerHTML=`${f.size||''}${f.date?' · '+f.date:''}${f.meta&&f.meta.auteur?' · '+f.meta.auteur:''}${stBadge}`;
+  const eb=extStyle(f.ext);
+  const tb=document.getElementById('pv-type-badge');
+  tb.textContent=(f.ext||'–').toUpperCase(); tb.style.background=eb.bg; tb.style.color=eb.col;
+  // DL btn
+  document.getElementById('pv-dl-btn').disabled=!f.stored;
+  // Tags
+  renderPvTags(f);
+  // Load preview
+  loadPreview(f);
+}
+
+async function loadPreview(f){
+  const body=document.getElementById('pv-body');
+  body.className='loading'; body.innerHTML='';
+
+  if(!f.stored){
+    body.className='';
+    body.innerHTML=`<div id="pv-sample">
+      <div class="sp-ico">${ico(f)}</div>
+      <div class="sp-title">${esc(f.name)}</div>
+      <div class="sp-msg">Ce fichier est un <b>exemple de structure</b>.<br>Importez le vrai fichier pour activer la prévisualisation.</div>
+      <button class="btn primary" onclick="triggerUpload()" style="margin-top:8px">⬆ Importer ce document</button>
+    </div>`;
+    return;
+  }
+
+  let blob=null;
+  try{ blob=await getFile(f.id); }catch(e){}
+  if(!blob){ body.className=''; body.innerHTML=`<div id="pv-noprev"><div class="np-ico">⚠</div><div class="np-name">Fichier introuvable</div><div class="np-msg">Le fichier n'est pas disponible localement ni dans le cloud.<br>Réimportez-le pour le récupérer.</div></div>`; return; }
+
+  // Revoke old URL
+  if(blobURLs[f.id]){ URL.revokeObjectURL(blobURLs[f.id]); delete blobURLs[f.id]; }
+
+  const ext=(f.ext||'').toLowerCase();
+  body.className=''; // remove loading
+
+  /* ── PDF — rendu PDF.js (compatible iOS/Android) ── */
+  if(isPDF(ext)){
+    // Configurer le worker PDF.js
+    if(typeof pdfjsLib !== 'undefined'){
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+    body.innerHTML=`
+      <div id="pv-pdf-toolbar">
+        <button id="pdf-prev" onclick="pdfPrevPage()" disabled>◀ Préc.</button>
+        <span id="pdf-page-info" style="min-width:90px;text-align:center">Chargement…</span>
+        <button id="pdf-next" onclick="pdfNextPage()" disabled>Suiv. ▶</button>
+      </div>
+      <div id="pv-pdf-wrap"></div>`;
+    try{
+      const arr = await blob.arrayBuffer();
+      const pdfDoc = await pdfjsLib.getDocument({data: arr}).promise;
+      window._pdfDoc = pdfDoc;
+      window._pdfPage = 1;
+      async function renderPdfPage(num){
+        document.getElementById('pdf-page-info').textContent =
+          `Page ${num} / ${pdfDoc.numPages}`;
+        document.getElementById('pdf-prev').disabled = num <= 1;
+        document.getElementById('pdf-next').disabled = num >= pdfDoc.numPages;
+        const wrap = document.getElementById('pv-pdf-wrap');
+        if(!wrap) return;
+        wrap.innerHTML = '<p style="color:#ccc;font-size:12px;padding:20px">⏳ Rendu en cours…</p>';
+        const page = await pdfDoc.getPage(num);
+        const containerWidth = body.clientWidth - 24;
+        const viewport0 = page.getViewport({scale:1});
+        const scale = Math.min(2, containerWidth / viewport0.width);
+        const vp = page.getViewport({scale});
+        const canvas = document.createElement('canvas');
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        const ctx = canvas.getContext('2d');
+        await page.render({canvasContext:ctx, viewport:vp}).promise;
+        wrap.innerHTML = '';
+        wrap.appendChild(canvas);
+      }
+      window.pdfPrevPage = function(){ if(window._pdfPage>1){ window._pdfPage--; renderPdfPage(window._pdfPage); }};
+      window.pdfNextPage = function(){ if(window._pdfPage<window._pdfDoc.numPages){ window._pdfPage++; renderPdfPage(window._pdfPage); }};
+      renderPdfPage(1);
+    } catch(e){
+      body.innerHTML=`<div id="pv-noprev"><div class="np-ico">📄</div><div class="np-name">${esc(f.name)}</div><div class="np-msg">Impossible d'afficher ce PDF.<br>Utilisez le bouton ⬇ pour le télécharger.</div>${f.stored?`<button class="btn primary" onclick="dlFile()" style="margin-top:8px">⬇ Télécharger</button>`:''}</div>`;
+    }
+    return;
+  }
+
+  /* ── IMAGE ── */
+  if(isImg(ext)){
+    const url=URL.createObjectURL(blob); blobURLs[f.id]=url;
+    body.innerHTML=`<div id="pv-img-wrap"><img id="pv-img" src="${url}" alt="${esc(f.name)}"/></div>`;
+    return;
+  }
+
+  /* ── WORD (.docx) ── */
+  if(isWord(ext)){
+    body.innerHTML=`<div id="pv-word-wrap"><div id="pv-word-content"><p style="color:#8b9cad;font-size:12px">⏳ Conversion Word en cours…</p></div></div>`;
+    try{
+      const arr=await blob.arrayBuffer();
+      const result=await mammoth.convertToHtml({arrayBuffer:arr});
+      const content=document.getElementById('pv-word-content');
+      if(content) content.innerHTML=result.value||'<p style="color:#8b9cad">Document vide ou non lisible.</p>';
+      if(result.messages&&result.messages.length) console.log('Mammoth warnings:',result.messages);
+    }catch(e){
+      const w=document.getElementById('pv-word-wrap');
+      if(w) w.innerHTML=`<div id="pv-noprev"><div class="np-ico">📝</div><div class="np-name">${esc(f.name)}</div><div class="np-msg">Impossible de convertir ce fichier Word.<br>Téléchargez-le pour l'ouvrir dans Microsoft Word.</div></div>`;
+    }
+    return;
+  }
+
+  /* ── EXCEL / CSV ── */
+  if(isXL(ext)){
+    body.innerHTML=`<div style="padding:20px;font-size:12px;color:#8b9cad">⏳ Lecture du tableau en cours…</div>`;
+    try{
+      const arr=await blob.arrayBuffer();
+      const wb=XLSX.read(arr,{type:'array'});
+      const sheetNames=wb.SheetNames;
+
+      let tabsHtml=sheetNames.map((s,i)=>`<div class="xl-tab${i===0?' active':''}" onclick="xlSwitchSheet(this,'${esc(s)}')">${esc(s)}</div>`).join('');
+
+      function sheetToTable(sheetName){
+        const ws=wb.Sheets[sheetName];
+        const data=XLSX.utils.sheet_to_json(ws,{header:1,defval:'',raw:false});
+        if(!data||!data.length)return'<p style="padding:16px;color:#8b9cad;font-size:12px">Feuille vide</p>';
+        let t='<table class="xl-table"><thead><tr><th class="xl-row-num">#</th>';
+        const maxCols=Math.max(...data.map(r=>r.length));
+        for(let c=0;c<maxCols;c++) t+=`<th>${String.fromCharCode(65+c)}</th>`;
+        t+='</tr></thead><tbody>';
+        data.forEach((row,ri)=>{
+          t+=`<tr><td class="xl-row-num xl-table td">${ri+1}</td>`;
+          for(let ci=0;ci<maxCols;ci++) t+=`<td>${esc(String(row[ci]??''))}</td>`;
+          t+='</tr>';
+        });
+        t+='</tbody></table>';
+        return t;
+      }
+
+      const tables={};
+      sheetNames.forEach(s=>{ tables[s]=sheetToTable(s); });
+      window._xlTables=tables;
+      window._xlWb=wb;
+
+      body.innerHTML=`<div style="display:flex;flex-direction:column;height:100%">
+        <div id="pv-xl-tabs">${tabsHtml}</div>
+        <div id="pv-xl-table-wrap" style="overflow:auto;flex:1;padding:0">${tables[sheetNames[0]]}</div>
+      </div>`;
+    }catch(e){
+      body.innerHTML=`<div id="pv-noprev"><div class="np-ico">📊</div><div class="np-name">${esc(f.name)}</div><div class="np-msg">Impossible de lire ce fichier Excel.<br>Téléchargez-le pour l'ouvrir dans Excel.</div></div>`;
+    }
+    return;
+  }
+
+  /* ── VIDEO ── */
+  if(isVideo(ext)){
+    const url=URL.createObjectURL(blob); blobURLs[f.id]=url;
+    body.innerHTML=`<video id="pv-video" controls src="${url}"></video>`;
+    return;
+  }
+
+  /* ── AUDIO ── */
+  if(isAudio(ext)){
+    const url=URL.createObjectURL(blob); blobURLs[f.id]=url;
+    body.innerHTML=`<div id="pv-audio-wrap">
+      <div id="pv-audio-icon">🎵</div>
+      <div style="font-size:12px;font-weight:700;color:#0d2137;margin-bottom:4px">${esc(f.name)}</div>
+      <audio id="pv-audio" controls src="${url}"></audio>
+    </div>`;
+    return;
+  }
+
+  /* ── Fallback ── */
+  body.innerHTML=`<div id="pv-noprev">
+    <div class="np-ico">${ico(f)}</div>
+    <div class="np-name">${esc(f.name)}</div>
+    <div class="np-msg">La prévisualisation n'est pas disponible pour ce type de fichier<br><b>(.${esc(ext||'?')})</b>.<br><br>Utilisez le bouton ⬇ pour télécharger et ouvrir le fichier.</div>
+    ${f.stored?`<button class="btn primary" onclick="dlFile()" style="margin-top:8px">⬇ Télécharger</button>`:''}
+  </div>`;
+}
+
+function xlSwitchSheet(el,name){
+  document.querySelectorAll('.xl-tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  const wrap=document.getElementById('pv-xl-table-wrap');
+  if(wrap&&window._xlTables) wrap.innerHTML=window._xlTables[name]||'';
+}
+
+function closePreview(){
+  previewOpen=false;
+  document.getElementById('preview-panel').classList.remove('show');
+  selFile=null;
+  document.getElementById('sb-sel').textContent='–';
+  buildTree(); renderExplorer();
+}
+
+function badgeCls(st){ const m={'Validé':'badge-ok','Approuvé':'badge-ok','En vigueur':'badge-ok','Finalisé':'badge-ok','En cours':'badge-warn','Brouillon':'badge-warn','Archivé':'badge-err'}; return m[st]||'badge-gray'; }
+
+/* ═══════════════════════════════════════════════
+   TAGS in preview
+═══════════════════════════════════════════════ */
+function renderPvTags(f){
+  const row=document.getElementById('pv-tags-row');
+  if(!row)return;
+  row.innerHTML=(f.tags&&f.tags.length
+    ? f.tags.map((t,i)=>tagPillRemovable(t,i,f.id)).join(' ')
+    : '<span style="font-size:10px;color:#8b9cad">Aucun tag — ajoutez-en ci-dessous</span>'
+  );
+}
+
+function addTagPv(){
+  const inp=document.getElementById('pv-tag-input');
+  if(!selFile||!inp||!inp.value.trim())return;
+  const r=find(selFile.id,TREE); if(!r)return;
+  if(!r.node.tags)r.node.tags=[];
+  const t=inp.value.trim();
+  if(!r.node.tags.includes(t)){ r.node.tags.push(t); logIt('🏷',`Tag "<b>${t}</b>" ajouté`); }
+  inp.value=''; saveTree(); renderPvTags(r.node); renderExplorer();
+}
+
+function removeTag(fid,tag){
+  const r=find(fid,TREE); if(!r)return;
+  r.node.tags=(r.node.tags||[]).filter(t=>t!==tag);
+  logIt('🏷',`Tag "<b>${tag}</b>" retiré`);
+  saveTree(); renderPvTags(r.node); renderExplorer();
+}
+
+/* ═══════════════════════════════════════════════
+   METADATA SIDEBAR
+═══════════════════════════════════════════════ */
+function showMeta(){
+  metaOpen=!metaOpen;
+  document.getElementById('meta-sidebar').classList.toggle('show',metaOpen);
+  if(metaOpen && selFile) renderMetaSidebar(selFile);
+}
+
+function renderMetaSidebar(f){
+  const stB=f.meta&&f.meta.statut?`<span class="badge ${badgeCls(f.meta.statut)}" style="margin-left:4px">${f.meta.statut}</span>`:'';
+  document.getElementById('meta-sidebar').innerHTML=`
+    <div style="text-align:center;padding:8px 0 10px;border-bottom:1px solid #eef2f7;margin-bottom:4px">
+      <div style="font-size:34px">${ico(f)}</div>
+      <div style="font-size:11px;font-weight:700;color:#0d2137;margin-top:5px;word-break:break-word">${esc(f.name)}</div>
+      <div style="margin-top:5px">${extBadge(f.ext)} ${stB}</div>
+      ${f.stored?'<span class="badge badge-ok" style="margin-top:4px;display:inline-block">✓ Importé</span>':'<span class="badge badge-gray" style="margin-top:4px;display:inline-block">Exemple</span>'}
+    </div>
+    <div class="ms-head">Informations</div>
+    <div class="ms-row"><em>Taille :</em> ${f.size||'–'}</div>
+    <div class="ms-row"><em>Date :</em> ${f.date||'–'}</div>
+    <div class="ms-row"><em>Type :</em> ${(f.ext||'–').toUpperCase()}</div>
+    <div class="ms-head">Métadonnées</div>
+    <div class="ms-row"><em>Auteur :</em> ${esc((f.meta||{}).auteur)||'–'}</div>
+    <div class="ms-row"><em>Version :</em> ${esc((f.meta||{}).version)||'–'}</div>
+    <div class="ms-row"><em>Description :</em><br>${esc(f.desc||'–')}</div>
+    <div class="ms-head">Actions</div>
+    <div style="display:flex;flex-direction:column;gap:5px">
+      ${f.stored?`<button class="btn sm primary" onclick="dlFile()">⬇ Télécharger</button>`:''}
+      <button class="btn sm danger" onclick="del('${f.id}')">🗑 Supprimer</button>
+    </div>`;
+}
+
+/* ═══════════════════════════════════════════════
+   UPLOAD
+═══════════════════════════════════════════════ */
+function triggerUpload(){ document.getElementById('file-input').value=''; document.getElementById('file-input').click(); }
+function handleFileInput(files){ if(files&&files.length) startFlow(Array.from(files)); }
+
+function startFlow(files){ pending=files; pendingIdx=0; nextFile(); }
+
+function nextFile(){
+  if(pendingIdx>=pending.length){
+    renderExplorer(); buildTree(); saveTree(); updateSizeBar();
+    toast(`${pending.length} fichier(s) importé(s)`, 'good');
+    return;
+  }
+  const f=pending[pendingIdx];
+  const ext=(f.name.split('.').pop()||'').toLowerCase();
+  document.getElementById('mfc').innerHTML=`<div class="mfc-ico">${ico({type:'file',ext})}</div><div><div class="mfc-name">${esc(f.name)}</div><div class="mfc-size">${fmtSize(f.size)} · ${f.type||ext.toUpperCase()}</div></div>`;
+  document.getElementById('meta-modal-title').textContent=`✏ Métadonnées du fichier`;
+  document.getElementById('meta-counter-lbl').textContent=`Fichier ${pendingIdx+1} sur ${pending.length}`;
+  document.getElementById('m-auteur').value='';
+  document.getElementById('m-statut').value='Validé';
+  document.getElementById('m-tags').value='';
+  document.getElementById('m-desc').value='';
+  document.getElementById('modal-meta').classList.add('show');
+}
+
+async function saveMeta(){
+  closeModal('modal-meta');
+  /* CORRECTION Bug 1+2 — try/catch/finally pour garantir le rafraîchissement de l'interface
+     même si le stockage IndexedDB échoue (base pleine, mode privé, erreur réseau…) */
+  try {
+    await storeFile(pending[pendingIdx], {
+      auteur: document.getElementById('m-auteur').value.trim(),
+      statut: document.getElementById('m-statut').value,
+      tags:   document.getElementById('m-tags').value.split(',').map(t=>t.trim()).filter(Boolean),
+      desc:   document.getElementById('m-desc').value.trim()
+    });
+  } catch(e) {
+    console.error('saveMeta: erreur lors du stockage du fichier', e);
+    toast('Erreur lors de l\'import — le fichier est visible mais non stocké', 'err');
+  } finally {
+    /* "finally" s'exécute TOUJOURS, succès ou erreur → l'interface se met à jour dans tous les cas */
+    pendingIdx++;
+    nextFile();
+  }
+}
+
+async function skipMeta(){
+  closeModal('modal-meta');
+  /* CORRECTION Bug 4 — même protection que saveMeta */
+  try {
+    await storeFile(pending[pendingIdx], {auteur:'', statut:'Brouillon', tags:[], desc:''});
+  } catch(e) {
+    console.error('skipMeta: erreur lors du stockage du fichier', e);
+    toast('Erreur lors de l\'import — le fichier est visible mais non stocké', 'err');
+  } finally {
+    pendingIdx++;
+    nextFile();
+  }
+}
+
+async function storeFile(file, meta){
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const id  = 'up_' + (++idCtr);
+  const node = curNode || TREE;
+  if(!node.children) node.children = [];
+
+  /* CORRECTION Bug 2 — on crée le nœud d'abord (stored: false provisoire)
+     L'arbre est mis à jour immédiatement, avant toute opération asynchrone.
+     Ainsi, même si IndexedDB échoue, le fichier apparaît dans l'interface. */
+  const fileNode = {
+    id,
+    name:     file.name,
+    type:     'file',
+    ext,
+    size:     fmtSize(file.size),
+    rawSize:  file.size,
+    date:     new Date().toLocaleDateString('fr-FR'),
+    mimeType: file.type,
+    stored:   false,           /* sera mis à true si le stockage binaire réussit */
+    tags:     meta.tags,
+    desc:     meta.desc,
+    meta:     { auteur: meta.auteur, version: 'v1', statut: meta.statut }
+  };
+  node.children.push(fileNode);
+
+  /* Stockage local + upload cloud via saveFile() */
+  try {
+    await saveFile(id, file);
+    fileNode.stored = true;    /* ✓ stockage confirmé */
+  } catch(e) {
+    if(e && e.name === 'QuotaExceededError'){
+      toast('Espace de stockage insuffisant — fichier ajouté sans stockage binaire', 'err');
+    } else {
+      toast('Stockage indisponible — fichier ajouté sans prévisualisation', 'err');
+    }
+    console.warn('saveFile échoué pour', file.name, '— cause :', e);
+  }
+
+  logIt('📎', `Importé : <b>${file.name}</b> (${fmtSize(file.size)}) dans <b>${node.name}</b>${fileNode.stored ? '' : ' <i>(sans stockage binaire)</i>'}`);
+}
+
+/* ═══════════════════════════════════════════════
+   DÉPLACER & COPIER
+   ─────────────────────────────────────────────
+   Variables d'état pour le modal :
+     moveItemId  → l'id de l'élément qu'on veut déplacer ou copier
+     moveMode    → 'move' ou 'copy'
+     moveSelDest → l'id du dossier destination sélectionné dans le modal
+═══════════════════════════════════════════════ */
+let moveItemId  = null;
+let moveMode    = null;
+let moveSelDest = null;
+
+/* ──────────────────────────────────────────────────────────────────
+   isDescendantOrSelf(ancestorId, testId)
+   Vérifie si testId est l'élément lui-même OU l'un de ses descendants.
+   Utilisé pour empêcher de déplacer un dossier dans l'un de ses enfants.
+   Exemple : on ne peut pas déplacer le dossier "A" dans "A/A1".
+────────────────────────────────────────────────────────────────── */
+function isDescendantOrSelf(ancestorId, testId) {
+  // Cas 1 : c'est le même nœud
+  if (ancestorId === testId) return true;
+  // Cas 2 : on cherche ancestorId dans l'arbre, puis on regarde
+  //         si testId apparaît parmi ses enfants ou petits-enfants
+  const r = find(ancestorId, TREE);
+  if (!r || !r.node.children) return false;
+  function walk(node) {
+    if (node.id === testId) return true;                    // trouvé !
+    if (node.children) return node.children.some(walk);    // continue la recherche
+    return false;
+  }
+  return r.node.children.some(walk);
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   getAllFolders(node, depth, excludedId)
+   Retourne la liste à plat de TOUS les dossiers de l'arbre,
+   en sautant excludedId et ses sous-dossiers (l'élément déplacé lui-même).
+   Chaque entrée contient { id, name, depth } pour l'indentation visuelle.
+────────────────────────────────────────────────────────────────── */
+function getAllFolders(node, depth, excludedId) {
+  let list = [];
+  // Si ce nœud est un dossier ET n'est pas l'élément exclu...
+  if (node.type === 'folder' && !isDescendantOrSelf(excludedId, node.id)) {
+    list.push({ id: node.id, name: node.name, depth });
+    // ...on parcourt récursivement ses enfants
+    if (node.children) {
+      for (const child of node.children) {
+        list = list.concat(getAllFolders(child, depth + 1, excludedId));
+      }
+    }
+  }
+  return list;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   showMoveModal(itemId, mode)
+   Ouvre le modal de sélection de dossier destination.
+     itemId : l'id du fichier ou dossier à traiter
+     mode   : 'move' (déplacer) ou 'copy' (copier)
+────────────────────────────────────────────────────────────────── */
+function showMoveModal(itemId, mode) {
+  moveItemId  = itemId;
+  moveMode    = mode;
+  moveSelDest = null;  // aucun dossier sélectionné pour l'instant
+
+  // On retrouve l'élément dans l'arbre pour afficher son nom dans le modal
+  const r = find(itemId, TREE);
+  if (!r) return;
+  const item = r.node;
+
+  // ── Mise à jour du titre et du bouton de confirmation ──
+  const isMove = (mode === 'move');
+  document.getElementById('mv-title').textContent =
+    isMove ? `✂ Déplacer "${item.name}"` : `⧉ Copier "${item.name}"`;
+  document.getElementById('mv-confirm-btn').textContent =
+    isMove ? '✂ Déplacer ici' : '⧉ Copier ici';
+  document.getElementById('mv-confirm-btn').disabled = true; // désactivé tant qu'aucun dossier n'est choisi
+
+  // ── Aperçu de l'élément dans le modal ──
+  document.getElementById('mv-ico').textContent = ico(item);
+  document.getElementById('mv-item-name').textContent = item.name;
+  document.getElementById('mv-item-type').textContent =
+    item.type === 'folder'
+      ? `Dossier · ${(item.children||[]).length} élément(s)`
+      : `Fichier ${(item.ext||'').toUpperCase()} · ${item.size||''}`;
+
+  // ── Construction de la liste des dossiers disponibles ──
+  // On exclut l'élément lui-même (et ses descendants si c'est un dossier)
+  const folders = getAllFolders(TREE, 0, itemId);
+  // On identifie le dossier parent actuel pour le mettre en évidence
+  const parentNode = findParent(itemId, TREE);
+
+  let html = '';
+  for (const f of folders) {
+    const isOrigin = parentNode && f.id === parentNode.id; // c'est le dossier d'origine
+    const indent   = f.depth * 16;                         // décalage visuel selon la profondeur
+    html += `
+      <div class="mv-row${isOrigin ? ' mv-origin' : ''}"
+           id="mvrow-${f.id}"
+           onclick="selectMvTarget('${f.id}')"
+           style="padding-left:${10 + indent}px">
+        <span style="font-size:13px">📁</span>
+        <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(f.name)}</span>
+        ${isOrigin ? '<span class="mv-badge">dossier actuel</span>' : ''}
+      </div>`;
+  }
+
+  document.getElementById('mv-folder-list').innerHTML =
+    html || '<p style="padding:14px;color:#8b9cad;font-size:11px">Aucun dossier disponible.</p>';
+
+  // On ouvre le modal
+  document.getElementById('modal-move').classList.add('show');
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   selectMvTarget(folderId)
+   Appelé quand l'utilisateur clique sur un dossier dans la liste.
+   Met en surbrillance la ligne sélectionnée et active le bouton.
+────────────────────────────────────────────────────────────────── */
+function selectMvTarget(folderId) {
+  moveSelDest = folderId;
+  // On retire la surbrillance de toutes les lignes...
+  document.querySelectorAll('.mv-row').forEach(el => el.classList.remove('mv-sel'));
+  // ...et on l'applique uniquement à la ligne cliquée
+  const row = document.getElementById('mvrow-' + folderId);
+  if (row) row.classList.add('mv-sel');
+  // On active le bouton de confirmation maintenant qu'un dossier est choisi
+  document.getElementById('mv-confirm-btn').disabled = false;
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   confirmMoveOrCopy()
+   Appelé par le bouton "Déplacer ici" ou "Copier ici" du modal.
+   Redirige vers moveItem() ou copyItem() selon moveMode.
+────────────────────────────────────────────────────────────────── */
+async function confirmMoveOrCopy() {
+  if (!moveSelDest) {
+    toast('Sélectionnez d\'abord un dossier de destination', 'err');
+    return;
+  }
+  closeModal('modal-move');
+  if (moveMode === 'move') {
+    moveItem(moveItemId, moveSelDest);
+  } else {
+    await copyItem(moveItemId, moveSelDest);
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   moveItem(itemId, targetFolderId)
+   ──────────────────────────────────────────────────────────────
+   Déplace un fichier ou un dossier vers un nouveau dossier parent.
+   L'élément est RETIRÉ de son dossier d'origine et AJOUTÉ dans la cible.
+   Le contenu binaire (IndexedDB) n'est PAS touché : seul l'arbre JSON change.
+══════════════════════════════════════════════════════════════════ */
+function moveItem(itemId, targetFolderId) {
+
+  // ── Étape 1 : retrouver l'élément dans l'arbre ──
+  const r = find(itemId, TREE);
+  if (!r) { toast('Élément introuvable', 'err'); return; }
+  const item = r.node;
+
+  // ── Étape 2 : sécurité — empêcher de mettre un dossier dans lui-même ──
+  // Exemple : on ne peut pas déplacer "A" dans "A/Sous-dossier"
+  if (item.type === 'folder' && isDescendantOrSelf(itemId, targetFolderId)) {
+    toast('Impossible : la destination est un sous-dossier de l\'élément déplacé', 'err');
+    return;
+  }
+
+  // ── Étape 3 : retrouver le dossier parent actuel ──
+  const parent = findParent(itemId, TREE);
+  if (!parent) { toast('Dossier parent introuvable', 'err'); return; }
+
+  // ── Étape 4 : vérifier qu'on ne déplace pas au même endroit ──
+  if (parent.id === targetFolderId) {
+    toast('L\'élément est déjà dans ce dossier', 'ok');
+    return;
+  }
+
+  // ── Étape 5 : retrouver le dossier de destination ──
+  const destR = find(targetFolderId, TREE);
+  if (!destR || destR.node.type !== 'folder') { toast('Dossier cible invalide', 'err'); return; }
+  const dest = destR.node;
+
+  // ── Étape 6 : retirer l'élément du dossier d'origine ──
+  // On recrée le tableau children du parent sans notre élément (filter garde tout SAUF itemId)
+  parent.children = parent.children.filter(c => c.id !== itemId);
+
+  // ── Étape 7 : ajouter l'élément dans le dossier de destination ──
+  if (!dest.children) dest.children = [];
+  dest.children.push(item);
+
+  // ── Étape 8 : mise à jour de la référence si le fichier était sélectionné ──
+  if (selFile && selFile.id === itemId) selFile = item;
+
+  // ── Étape 9 : journaliser, sauvegarder, rafraîchir ──
+  logIt('✂', `Déplacé : <b>${item.name}</b> vers <b>${dest.name}</b>`);
+  saveTree();
+  buildTree();
+  renderExplorer();
+  toast(`"${item.name}" déplacé vers "${dest.name}"`, 'good');
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   copyItem(itemId, targetFolderId)
+   ──────────────────────────────────────────────────────────────
+   Duplique un fichier ou un dossier dans un dossier cible.
+   L'original N'EST PAS modifié.
+   Pour les fichiers avec un binaire stocké, le blob est aussi copié dans IndexedDB.
+══════════════════════════════════════════════════════════════════ */
+async function copyItem(itemId, targetFolderId) {
+
+  // ── Étape 1 : retrouver l'élément original ──
+  const r = find(itemId, TREE);
+  if (!r) { toast('Élément introuvable', 'err'); return; }
+  const item = r.node;
+
+  // ── Étape 2 : retrouver le dossier de destination ──
+  const destR = find(targetFolderId, TREE);
+  if (!destR || destR.node.type !== 'folder') { toast('Dossier cible invalide', 'err'); return; }
+  const dest = destR.node;
+
+  // ── Étape 3 : cloner l'élément avec de NOUVEAUX IDs uniques ──
+  // deepCloneWithNewIds() crée une copie complète et indépendante de l'original.
+  const clone = deepCloneWithNewIds(item);
+
+  // ── Étape 4 : ajouter le suffixe "(copie)" au nom ──
+  // On insère "(copie)" juste avant l'extension  ex: "rapport.pdf" → "rapport (copie).pdf"
+  clone.name = clone.name.replace(/^(.*?)(\.[^.]+)?$/, (_, base, ext) => `${base} (copie)${ext||''}`);
+
+  // ── Étape 5 : si c'est un fichier avec un binaire, copier aussi le blob dans IndexedDB ──
+  if (item.type === 'file' && item.stored && db) {
+    try {
+      const blob = await idbGet(itemId);   // on récupère le fichier binaire de l'original
+      if (blob) {
+        await idbPut(clone.id, blob);      // on le stocke sous le NOUVEL id du clone
+        clone.stored = true;               // le clone est maintenant aussi stocké
+      }
+    } catch (e) {
+      // Si le stockage échoue (quota, etc.), la copie existe dans l'arbre mais sans binaire
+      console.warn('copyItem: impossible de copier le blob', e);
+      clone.stored = false;
+      toast('Copie créée, mais le fichier binaire n\'a pas pu être dupliqué (stockage plein ?)', 'err');
+    }
+  }
+
+  // ── Étape 6 : ajouter le clone dans le dossier de destination ──
+  if (!dest.children) dest.children = [];
+  dest.children.push(clone);
+
+  // ── Étape 7 : journaliser, sauvegarder, rafraîchir ──
+  logIt('⧉', `Copié : <b>${item.name}</b> → <b>${dest.name}</b>`);
+  saveTree();
+  buildTree();
+  renderExplorer();
+  updateSizeBar();
+  toast(`Copie de "${item.name}" créée dans "${dest.name}"`, 'good');
+}
+
+/* ──────────────────────────────────────────────────────────────────
+   deepCloneWithNewIds(node)
+   Crée une copie TOTALEMENT INDÉPENDANTE d'un nœud (et de tous ses enfants).
+   Chaque nœud reçoit un ID unique pour ne jamais entrer en conflit avec l'original.
+   Tous les fichiers clonés sont marqués stored:false par défaut
+   (le binaire sera copié séparément dans copyItem si nécessaire).
+────────────────────────────────────────────────────────────────── */
+function deepCloneWithNewIds(node) {
+  // JSON.parse(JSON.stringify()) crée une copie en profondeur de toute la structure
+  const clone = JSON.parse(JSON.stringify(node));
+
+  // On parcourt récursivement le clone pour attribuer de nouveaux IDs
+  function reassignIds(n) {
+    n.id     = 'cp_' + (++idCtr);   // nouvel ID unique basé sur le compteur global
+    n.stored = false;                // le binaire n'est pas encore copié
+    if (n.children) n.children.forEach(reassignIds);
+  }
+  reassignIds(clone);
+  return clone;
+}
+
+/* ═══════════════════════════════════════════════
+   TÉLÉCHARGER & SUPPRIMER
+async function dlFile(){
+  if(!selFile||!selFile.stored){toast('Fichier non disponible','err');return;}
+  const blob=await getFile(selFile.id);
+  if(!blob){toast('Fichier introuvable en local ni sur le serveur','err');return;}
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=selFile.name; a.click();
+  logIt('⬇',`Téléchargé : <b>${selFile.name}</b>`); toast('Téléchargement démarré','good');
+}
+
+async function del(id){
+  const r=find(id,TREE); if(!r)return;
+  const isFolder=r.node.type==='folder';
+  const cnt=isFolder?(r.node.children||[]).length:0;
+  if(!confirm(isFolder?`Supprimer le dossier "${r.node.name}" et ses ${cnt} élément(s) ?`:`Supprimer "${r.node.name}" ?`))return;
+  const parent=findParent(id,TREE);
+  if(parent)parent.children=parent.children.filter(c=>c.id!==id);
+  if(!isFolder&&r.node.stored){
+    // Suppression locale
+    try{await idbDel(id);}catch(e){}
+    // Suppression cloud
+    if(window.fbDeleteFile) window.fbDeleteFile(id).catch(()=>{});
+  }
+  if(blobURLs[id]){URL.revokeObjectURL(blobURLs[id]);delete blobURLs[id];}
+  if(selFile&&selFile.id===id) closePreview();
+  logIt('🗑',`Supprimé : <b>${r.node.name}</b>`);
+  saveTree(); updateSizeBar(); renderExplorer(); buildTree();
+  toast(`"${r.node.name}" supprimé`,'ok');
+}
+
+function deleteFilePv(){ if(selFile)del(selFile.id); }
+
+/* ═══════════════════════════════════════════════
+   TABS
+═══════════════════════════════════════════════ */
+function switchTab(tab,el){
+  curTab=tab;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('act')); el.classList.add('act');
+  const isExp=tab==='explorer';
+  document.getElementById('toolbar').style.display=isExp?'flex':'none';
+  document.getElementById('preview-panel').style.display=isExp?'':'none';
+  document.getElementById('meta-sidebar').style.display=isExp?'':'none';
+  const logWrap=document.getElementById('log-wrap'), expWrap=document.getElementById('exp-wrap');
+  if(logWrap)logWrap.remove(); if(expWrap)expWrap.remove();
+
+  if(tab==='explorer'){ renderExplorer(); document.getElementById('preview-panel').style.display=''; document.getElementById('meta-sidebar').style.display=''; }
+  else if(tab==='log') renderLog();
+  else if(tab==='export') renderExport();
+}
+
+/* ═══════════════════════════════════════════════
+   LOG
+═══════════════════════════════════════════════ */
+function renderLog(){
+  let h='';
+  if(!activity.length) h='<div class="empty-folder"><div class="ef-ico" style="font-size:36px">📋</div><div class="ef-txt">Aucune activité enregistrée</div></div>';
+  else {
+    let ld='';
+    for(const e of activity){
+      if(e.date!==ld){h+=`<div class="log-day">${e.date}</div>`;ld=e.date;}
+      h+=`<div class="log-entry"><div class="log-time">${e.time}</div><div class="log-ico">${e.icon}</div><div class="log-txt">${e.text}</div></div>`;
+    }
+  }
+  const wrap=document.createElement('div'); wrap.id='log-wrap';
+  wrap.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><div><div style="font-size:14px;font-weight:700;color:#0d2137">Journal d'activité</div><div style="font-size:11px;color:#8b9cad">${activity.length} entrée(s)</div></div><button class="btn sm danger" onclick="clearLog()">🗑 Vider</button></div>${h}`;
+  document.getElementById('pane').appendChild(wrap);
+}
+function clearLog(){ if(confirm('Effacer le journal ?')){activity.length=0;saveLog();renderLog();} }
+
+/* ═══════════════════════════════════════════════
+   EXPORT
+═══════════════════════════════════════════════ */
+function buildTxt(n,pfx,last){
+  let s=pfx+(pfx?(last?'└── ':'├── '):'')+ n.name+(n.stored?' ✓':'')+'\n';
+  if(n.children&&n.children.length){const np=pfx+(pfx?(last?'    ':'│   '):'');n.children.forEach((c,i)=>s+=buildTxt(c,np,i===n.children.length-1));}
+  return s;
+}
+async function renderExport(){
+  const tree=buildTxt(TREE,'',true);
+  const {f,d}=countAll(TREE);
+  const sz=await idbSize();
+  const csv=['"Nom","Type","Ext","Taille","Date","Tags","Auteur","Statut","Importé"'];
+  function scanCsv(n){ if(n.type==='file') csv.push(`"${n.name}","Fichier","${n.ext||''}","${n.size||''}","${n.date||''}","${(n.tags||[]).join(';')}","${(n.meta||{}).auteur||''}","${(n.meta||{}).statut||''}","${n.stored?'Oui':'Non'}"`); if(n.children)n.children.forEach(scanCsv); }
+  scanCsv(TREE);
+  window._gTree=tree; window._gCsv=csv;
+  const wrap=document.createElement('div'); wrap.id='exp-wrap';
+  wrap.innerHTML=`
+    <div style="margin-bottom:12px"><div style="font-size:14px;font-weight:700;color:#0d2137">Export & Rapports</div></div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="sv">${d-1}</div><div class="sl">Dossiers</div></div>
+      <div class="stat-card"><div class="sv">${f}</div><div class="sl">Fichiers</div></div>
+      <div class="stat-card"><div class="sv">${activity.length}</div><div class="sl">Activités</div></div>
+      <div class="stat-card"><div class="sv">${fmtSize(sz)}</div><div class="sl">Stockage</div></div>
+    </div>
+    <div class="exp-card">
+      <div class="exp-hd">📁 Arborescence<div style="display:flex;gap:6px"><button class="btn sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(window._gTree)">📋 Copier</button><button class="btn sm primary" onclick="dl(new Blob([window._gTree],{type:'text/plain'}),'arborescence.txt')">⬇ .txt</button></div></div>
+      <div class="exp-body">${esc(tree)}</div>
+    </div>
+    <div class="exp-card">
+      <div class="exp-hd">📊 Inventaire CSV<button class="btn sm primary" onclick="dl(new Blob(['\\uFEFF'+window._gCsv.join('\\r\\n')],{type:'text/csv'}),'inventaire_plaisance.csv')">⬇ CSV</button></div>
+      <div class="exp-body">${esc(csv.slice(0,4).join('\n'))}${csv.length>4?'\n… ('+csv.length+' lignes)':''}</div>
+    </div>
+    <div class="exp-card">
+      <div class="exp-hd">💾 Sauvegarde structure<div style="display:flex;gap:6px"><button class="btn sm success" onclick="exportJson()">⬇ JSON</button><button class="btn sm" onclick="document.getElementById('ri').click()">⬆ Restaurer</button><input type="file" id="ri" accept=".json" style="display:none" onchange="importJson(this)"/></div></div>
+      <div class="exp-body" style="padding:10px 14px;font-size:11px;font-family:inherit">Exporte la structure et les métadonnées. Les fichiers binaires sont à télécharger individuellement.</div>
+    </div>`;
+  document.getElementById('pane').appendChild(wrap);
+}
+
+function dl(blob,name){ const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click(); }
+function exportJson(){ dl(new Blob([JSON.stringify({tree:TREE,date:new Date().toISOString(),v:3}),],{type:'application/json'}),'backup_ged_plaisance.json'); logIt('💾','Sauvegarde JSON exportée'); toast('Sauvegarde téléchargée','good'); }
+function importJson(input){ const f=input.files[0];if(!f)return;const r=new FileReader();r.onload=e=>{try{const b=JSON.parse(e.target.result);if(!b.tree)throw new Error();if(!confirm('Restaurer cette sauvegarde ?'))return;Object.assign(TREE,b.tree);saveTree();navTo('root');toast('Restauration réussie','good');logIt('⬆','GED restaurée depuis JSON');}catch(e){toast('Fichier JSON invalide','err');}};r.readAsText(f);input.value=''; }
+
+/* ═══════════════════════════════════════════════
+   FOLDER MODAL
+═══════════════════════════════════════════════ */
+function showFolderModal(){ document.getElementById('fn-name').value=''; document.getElementById('modal-folder').classList.add('show'); setTimeout(()=>document.getElementById('fn-name').focus(),80); }
+function confirmFolder(){
+  const name=document.getElementById('fn-name').value.trim();
+  if(!name){alert('Nom requis');return;}
+  const node=curNode||TREE;
+  if(!node.children)node.children=[];
+  node.children.push({id:'dir_'+(++idCtr),name,type:'folder',children:[]});
+  logIt('📁',`Dossier créé : <b>${name}</b>`);
+  closeModal('modal-folder'); saveTree(); renderExplorer(); buildTree(); toast(`"${name}" créé`,'good');
+}
+function closeModal(id){ document.getElementById(id).classList.remove('show'); }
+
+/* ═══════════════════════════════════════════════
+   SEARCH
+═══════════════════════════════════════════════ */
+function filterTree(q){
+  if(!q){buildTree();return;}
+  q=q.toLowerCase();
+  function match(n){return n.name.toLowerCase().includes(q)||(n.desc&&n.desc.toLowerCase().includes(q))||(n.tags&&n.tags.some(t=>t.toLowerCase().includes(q)))||(n.children&&n.children.some(match));}
+  function hl(s){return s.replace(new RegExp(q,'gi'),m=>`<mark style="background:#fef3c7;color:#92400e;border-radius:2px">${m}</mark>`);}
+  function render(n,depth){
+    if(!match(n))return'';
+    const pad=depth*14;
+    if(n.type==='folder'){
+      let h=`<div class="ti folder-ti" onclick="navTo('${n.id}')" style="padding-left:${10+pad}px"><div class="ti-ind"></div><span class="ti-ico">📁</span><span class="ti-lbl">${hl(n.name)}</span></div>`;
+      if(n.children)for(const c of n.children)h+=render(c,depth+1);
+      return h;
+    }
+    return`<div class="ti" onclick="pickFile('${n.id}')" style="padding-left:${24+pad}px"><span class="ti-ico" style="font-size:11px">${ico(n)}</span><span class="ti-lbl" style="font-size:10px">${hl(n.name)}</span></div>`;
+  }
+  document.getElementById('tree-wrap').innerHTML=render(TREE,0)||'<div style="padding:16px 10px;font-size:11px;color:#3d6d99">Aucun résultat</div>';
+}
+
+/* ═══════════════════════════════════════════════
+   DRAG & DROP
+═══════════════════════════════════════════════ */
+const upz=document.getElementById('upz');
+upz.addEventListener('dragover',e=>{e.preventDefault();upz.classList.add('hover');});
+upz.addEventListener('dragleave',()=>upz.classList.remove('hover'));
+upz.addEventListener('drop',e=>{e.preventDefault();upz.classList.remove('hover');const fs=Array.from(e.dataTransfer.files);if(fs.length)startFlow(fs);});
+document.body.addEventListener('dragover',e=>e.preventDefault());
+document.body.addEventListener('drop',e=>{e.preventDefault();const fs=Array.from(e.dataTransfer.files);if(fs.length&&curTab==='explorer')startFlow(fs);});
+
+/* ═══════════════════════════════════════════════
+   MODALS keyboard / click-outside
+═══════════════════════════════════════════════ */
+document.querySelectorAll('.overlay').forEach(m=>{m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');});});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){document.querySelectorAll('.overlay.show').forEach(m=>m.classList.remove('show'));}
+  if((e.ctrlKey||e.metaKey)&&e.key==='f'){e.preventDefault();document.getElementById('srch-inp').focus();}
+});
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+document.getElementById('tb-date').textContent=new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+
+// 1. Chargement local immédiat (affichage sans attendre le cloud)
+loadData();
+
+// 2. Init IndexedDB locale
+initDB()
+  .then(()=>{
+    document.getElementById('db-chip').className='ok';
+    document.getElementById('db-chip').textContent='✓ GED prête';
+    logIt('🚀','Application GED v5 démarrée — <b>Bienvenue Sonia</b>');
+    navTo('root');
+    updateSizeBar();
+  })
+  .catch(()=>{
+    document.getElementById('db-chip').className='err';
+    document.getElementById('db-chip').textContent='✗ Erreur BD locale';
+    logIt('⚠','Mode dégradé — stockage temporaire');
+    navTo('root');
+  });
+
+// 3. Synchronisation cloud : dès que Firebase est prêt, on charge l'arbre depuis Firestore
+//    (Firebase se charge en parallèle via le module ES en haut de page)
+if(window._firebaseReady){
+  syncTreeFromCloud();
+} else {
+  window.addEventListener('firebase-ready', ()=>syncTreeFromCloud(), {once:true});
+  // Timeout de sécurité : si Firebase ne répond pas en 8s, on continue en local
+  setTimeout(()=>{
+    if(!window._firebaseReady){
+      toast('⚠ Serveur Express inaccessible — mode local uniquement','err');
+      logIt('⚠','Serveur Express non disponible — lancez : node server.js');
+    }
+  }, 8000);
+}
+</script>
+</body>
+</html>
